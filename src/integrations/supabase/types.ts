@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      ev_contracts: {
+        Row: {
+          atingimento: number
+          cliente: string
+          created_at: string | null
+          created_by: string | null
+          data_inicio: string
+          id: string
+          nome_ev: string
+          operadora: string
+          porte: string
+          produto: string
+          updated_at: string | null
+        }
+        Insert: {
+          atingimento?: number
+          cliente: string
+          created_at?: string | null
+          created_by?: string | null
+          data_inicio: string
+          id?: string
+          nome_ev: string
+          operadora: string
+          porte: string
+          produto: string
+          updated_at?: string | null
+        }
+        Update: {
+          atingimento?: number
+          cliente?: string
+          created_at?: string | null
+          created_by?: string | null
+          data_inicio?: string
+          id?: string
+          nome_ev?: string
+          operadora?: string
+          porte?: string
+          produto?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null

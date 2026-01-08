@@ -11,7 +11,7 @@ export function processCommissions({ excelData, contracts }: ProcessingParams): 
   const results: ProcessedResult[] = [];
 
   for (const row of excelData) {
-    // Passo A: Matching por chave composta
+    // Passo A: Matching por chave composta (cliente + produto + operadora)
     const contract = findMatchingContract(row, contracts);
 
     if (!contract) {
@@ -23,7 +23,7 @@ export function processCommissions({ excelData, contracts }: ProcessingParams): 
       continue;
     }
 
-    // Passo B: Validação de Vigência
+    // Passo B: Validação de Vigência (12 meses a partir da data de início deste contrato específico)
     const dataInicio = parseISO(contract.dataInicio);
     const dataFim = addMonths(dataInicio, 12);
     const dataRecebimento = row.dataRecebimento;
@@ -73,14 +73,11 @@ function findMatchingContract(row: ExcelRow, contracts: Contract[]): Contract | 
   const normalizedProduto = normalizeString(row.produto);
   const normalizedOperadora = normalizeString(row.operadora);
 
-  // Busca contrato onde:
-  // 1. Cliente bate exatamente
-  // 2. Produto do Excel existe no array de produtos do contrato
-  // 3. Operadora do Excel existe no array de operadoras do contrato
+  // Busca contrato onde cliente + produto + operadora batem exatamente
   return contracts.find(c => {
     const clienteMatch = normalizeString(c.cliente) === normalizedCliente;
-    const produtoMatch = c.produtos.some(p => normalizeString(p) === normalizedProduto);
-    const operadoraMatch = c.operadoras.some(o => normalizeString(o) === normalizedOperadora);
+    const produtoMatch = normalizeString(c.produto) === normalizedProduto;
+    const operadoraMatch = normalizeString(c.operadora) === normalizedOperadora;
     
     return clienteMatch && produtoMatch && operadoraMatch;
   }) || null;
@@ -113,16 +110,19 @@ export function groupByEV(results: ProcessedResult[]): Record<string, ProcessedR
 // Calcula totais
 export function calculateTotals(results: ProcessedResult[]) {
   const validos = results.filter(r => r.status === 'valido');
-  const expirados = results.filter(r => r.status === 'expirado' || r.status === 'pre_vigencia');
+  const expirados = results.filter(r => r.status === 'expirado');
+  const preVigencia = results.filter(r => r.status === 'pre_vigencia');
   const naoEncontrados = results.filter(r => r.status === 'nao_encontrado');
 
   return {
     totalProcessado: results.reduce((sum, r) => sum + r.excelRow.nfLiquido, 0),
     totalComissaoValida: validos.reduce((sum, r) => sum + (r.comissao || 0), 0),
     totalExpirado: expirados.reduce((sum, r) => sum + r.excelRow.nfLiquido, 0),
+    totalPreVigencia: preVigencia.reduce((sum, r) => sum + r.excelRow.nfLiquido, 0),
     totalNaoEncontrado: naoEncontrados.reduce((sum, r) => sum + r.excelRow.nfLiquido, 0),
     countValidos: validos.length,
     countExpirados: expirados.length,
+    countPreVigencia: preVigencia.length,
     countNaoEncontrados: naoEncontrados.length
   };
 }

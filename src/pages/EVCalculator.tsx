@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ContractForm } from '@/components/ev/ContractForm';
+import { ContractExcelUpload } from '@/components/ev/ContractExcelUpload';
 import { ContractTable } from '@/components/ev/ContractTable';
 import { ExcelDropzone } from '@/components/ev/ExcelDropzone';
 import { ResultsDashboard } from '@/components/ev/ResultsDashboard';
@@ -142,10 +143,17 @@ const EVCalculator = () => {
 
             {/* Tab 1: Base de Contratos */}
             <TabsContent value="base" className="space-y-6">
-              <ContractForm 
-                onSubmit={addContracts}
-                existingEVNames={getUniqueEVNames()}
-              />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <ContractForm 
+                  onSubmit={addContracts}
+                  existingEVNames={getUniqueEVNames()}
+                />
+                
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-foreground">Importar do Excel</h3>
+                  <ContractExcelUpload onContractsLoaded={addContracts} />
+                </div>
+              </div>
               
               <div>
                 <h2 className="text-lg font-semibold text-foreground mb-4">

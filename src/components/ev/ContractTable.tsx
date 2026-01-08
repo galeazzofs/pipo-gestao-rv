@@ -65,15 +65,16 @@ export function ContractTable({ contracts, onDelete }: ContractTableProps) {
               <TableHead>Ating.</TableHead>
               <TableHead>Taxa</TableHead>
               <TableHead>Início</TableHead>
-              <TableHead>Fim (12m)</TableHead>
+              <TableHead>Fim Vigência</TableHead>
               <TableHead className="w-[60px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {Object.entries(groupedByCliente).map(([cliente, clienteContracts]) => (
               clienteContracts.map((contract, index) => {
-                const dataInicio = parseISO(contract.dataInicio);
-                const dataFim = addMonths(dataInicio, 12);
+              const dataInicio = parseISO(contract.dataInicio);
+                // Vigência de 12 meses: início em fev/26 termina em jan/27 (11 meses depois)
+                const dataFim = addMonths(dataInicio, 11);
                 const taxa = getTaxa(contract.porte, contract.atingimento);
                 const isExpired = new Date() > dataFim;
 

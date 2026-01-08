@@ -7,22 +7,25 @@ import { ContractTable } from '@/components/ev/ContractTable';
 import { ExcelDropzone } from '@/components/ev/ExcelDropzone';
 import { ResultsDashboard } from '@/components/ev/ResultsDashboard';
 import { ResultsTable } from '@/components/ev/ResultsTable';
-import { processCommissions } from '@/components/ev/ProcessingEngine';
+import { processCommissions, calculateTotals } from '@/components/ev/ProcessingEngine';
 import { useContracts } from '@/hooks/useContracts';
-import { ExcelRow, ProcessedResult } from '@/lib/evCalculations';
+import { useApuracoes } from '@/hooks/useApuracoes';
+import { ExcelRow, ProcessedResult, ContractLine, Porte } from '@/lib/evCalculations';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileSpreadsheet, Database, Play, Loader2 } from 'lucide-react';
+import { ArrowLeft, FileSpreadsheet, Database, Play, Loader2, Save, History } from 'lucide-react';
 
 const EVCalculator = () => {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
-  const { contracts, addContract, deleteContract, getUniqueEVNames, isLoading } = useContracts();
+  const { contracts, addMultipleContracts, deleteContract, getUniqueEVNames, isLoading } = useContracts();
+  const { saveApuracao } = useApuracoes();
   
   const [activeTab, setActiveTab] = useState('base');
   const [excelData, setExcelData] = useState<ExcelRow[]>([]);
   const [results, setResults] = useState<ProcessedResult[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [hasProcessed, setHasProcessed] = useState(false);
   
   // Filtros do dashboard
@@ -34,7 +37,6 @@ const EVCalculator = () => {
     
     setIsProcessing(true);
     
-    // Simula um pequeno delay para feedback visual
     await new Promise(resolve => setTimeout(resolve, 500));
     
     const processedResults = processCommissions({
@@ -51,6 +53,27 @@ const EVCalculator = () => {
     setExcelData(data);
     setHasProcessed(false);
     setResults([]);
+  };
+
+  const handleSaveApuracao = async () => {
+    if (results.length === 0) return;
+    
+    setIsSaving(true);
+    
+    const totals = calculateTotals(results);
+    const mesRef = selectedMonth !== '__all__' ? selectedMonth : 'Geral';
+    const nome = `Apuração ${mesRef}`;
+    
+    await saveApuracao(nome, mesRef, totals, results);
+    
+    setIsSaving(false);
+  };
+
+  const handleAddContracts = async (
+    baseContract: { nomeEV: string; cliente: string; porte: Porte; atingimento: number },
+    lines: ContractLine[]
+  ) => {
+    return await addMultipleContracts(baseContract, lines);
   };
 
   if (isLoading) {
@@ -75,12 +98,22 @@ const EVCalculator = () => {
                 <ArrowLeft className="w-4 h-4" />
                 Voltar
               </button>
-              <button
-                onClick={signOut}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Sair
-              </button>
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('/apuracoes')}
+                >
+                  <History className="w-4 h-4 mr-2" />
+                  Histórico
+                </Button>
+                <button
+                  onClick={signOut}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Sair
+                </button>
+              </div>
             </div>
             
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">
@@ -113,7 +146,7 @@ const EVCalculator = () => {
             {/* Tab 1: Base de Contratos */}
             <TabsContent value="base" className="space-y-6">
               <ContractForm 
-                onSubmit={addContract}
+                onSubmit={handleAddContracts}
                 existingEVNames={getUniqueEVNames()}
               />
               
@@ -155,6 +188,27 @@ const EVCalculator = () => {
                       </>
                     )}
                   </Button>
+
+                  {hasProcessed && results.length > 0 && (
+                    <Button
+                      onClick={handleSaveApuracao}
+                      disabled={isSaving}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Salvando...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4 mr-2" />
+                          Salvar Apuração
+                        </>
+                      )}
+                    </Button>
+                  )}
 
                   {contracts.length === 0 && (
                     <p className="text-sm text-muted-foreground text-center">

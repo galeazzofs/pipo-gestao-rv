@@ -80,6 +80,7 @@ export function ResultsTable({ results, selectedMonth, selectedEV }: ResultsTabl
               <TableHead>Data Rec.</TableHead>
               <TableHead>EV</TableHead>
               <TableHead>Cliente</TableHead>
+              <TableHead>Produto</TableHead>
               <TableHead>Operadora</TableHead>
               <TableHead>NF Líquido</TableHead>
               <TableHead>Vigência</TableHead>
@@ -105,6 +106,11 @@ export function ResultsTable({ results, selectedMonth, selectedEV }: ResultsTabl
                   <TableCell>
                     <span className="max-w-[200px] truncate block">
                       {result.excelRow.clienteMae}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-xs px-2 py-1 rounded-md bg-muted">
+                      {result.excelRow.produto || '-'}
                     </span>
                   </TableCell>
                   <TableCell>{result.excelRow.operadora || '-'}</TableCell>

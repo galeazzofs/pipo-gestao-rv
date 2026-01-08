@@ -23,9 +23,9 @@ export function processCommissions({ excelData, contracts }: ProcessingParams): 
       continue;
     }
 
-    // Passo B: Validação de Vigência (12 meses a partir da data de início deste contrato específico)
+    // Passo B: Validação de Vigência (12 meses = início em fev/26 termina em jan/27, ou seja, 11 meses depois)
     const dataInicio = parseISO(contract.dataInicio);
-    const dataFim = addMonths(dataInicio, 12);
+    const dataFim = addMonths(dataInicio, 11);
     const dataRecebimento = row.dataRecebimento;
 
     // Se data de recebimento é anterior ao início

@@ -42,6 +42,15 @@ export function ContractTable({ contracts, onDelete }: ContractTableProps) {
     );
   }
 
+  // Agrupar contratos por cliente
+  const groupedByCliente = contracts.reduce((acc, contract) => {
+    if (!acc[contract.cliente]) {
+      acc[contract.cliente] = [];
+    }
+    acc[contract.cliente].push(contract);
+    return acc;
+  }, {} as Record<string, Contract[]>);
+
   return (
     <div className="card-premium overflow-hidden">
       <div className="overflow-x-auto">
@@ -50,8 +59,8 @@ export function ContractTable({ contracts, onDelete }: ContractTableProps) {
             <TableRow className="bg-muted/50">
               <TableHead>EV</TableHead>
               <TableHead>Cliente</TableHead>
-              <TableHead>Produtos</TableHead>
-              <TableHead>Operadoras</TableHead>
+              <TableHead>Produto</TableHead>
+              <TableHead>Operadora</TableHead>
               <TableHead>Porte</TableHead>
               <TableHead>Ating.</TableHead>
               <TableHead>Taxa</TableHead>
@@ -61,89 +70,90 @@ export function ContractTable({ contracts, onDelete }: ContractTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {contracts.map((contract) => {
-              const dataInicio = parseISO(contract.dataInicio);
-              const dataFim = addMonths(dataInicio, 12);
-              const taxa = getTaxa(contract.porte, contract.atingimento);
-              const isExpired = new Date() > dataFim;
+            {Object.entries(groupedByCliente).map(([cliente, clienteContracts]) => (
+              clienteContracts.map((contract, index) => {
+                const dataInicio = parseISO(contract.dataInicio);
+                const dataFim = addMonths(dataInicio, 12);
+                const taxa = getTaxa(contract.porte, contract.atingimento);
+                const isExpired = new Date() > dataFim;
 
-              return (
-                <TableRow 
-                  key={contract.id}
-                  className={isExpired ? 'opacity-50 bg-destructive/5' : ''}
-                >
-                  <TableCell className="font-medium">{contract.nomeEV}</TableCell>
-                  <TableCell>{contract.cliente}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {contract.produtos.map(p => (
-                        <Badge key={p} variant="outline" className="text-xs">
-                          {p}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {contract.operadoras.map(o => (
-                        <Badge key={o} variant="secondary" className="text-xs">
-                          {o}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className="px-2 py-1 rounded-md bg-muted text-xs font-medium">
-                      {contract.porte}
-                    </span>
-                  </TableCell>
-                  <TableCell>{contract.atingimento}%</TableCell>
-                  <TableCell className="font-medium text-success">
-                    {formatPercent(taxa)}
-                  </TableCell>
-                  <TableCell>
-                    {format(dataInicio, 'MMM/yyyy', { locale: ptBR })}
-                  </TableCell>
-                  <TableCell>
-                    <span className={isExpired ? 'text-destructive font-medium' : ''}>
-                      {format(dataFim, 'MMM/yyyy', { locale: ptBR })}
-                    </span>
-                    {isExpired && (
-                      <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium bg-destructive text-destructive-foreground">
-                        Expirado
+                return (
+                  <TableRow 
+                    key={contract.id}
+                    className={`${isExpired ? 'opacity-50 bg-destructive/5' : ''} ${index === 0 ? 'border-t-2' : ''}`}
+                  >
+                    <TableCell className="font-medium">{contract.nomeEV}</TableCell>
+                    <TableCell>
+                      {index === 0 ? (
+                        <span className="font-medium">{cliente}</span>
+                      ) : (
+                        <span className="text-muted-foreground">↳</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">
+                        {contract.produto}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="text-xs">
+                        {contract.operadora}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span className="px-2 py-1 rounded-md bg-muted text-xs font-medium">
+                        {contract.porte}
                       </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Excluir contrato?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Tem certeza que deseja excluir o contrato de <strong>{contract.cliente}</strong>? 
-                            Esta ação não pode ser desfeita.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => onDelete(contract.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Excluir
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+                    </TableCell>
+                    <TableCell>{contract.atingimento}%</TableCell>
+                    <TableCell className="font-medium text-success">
+                      {formatPercent(taxa)}
+                    </TableCell>
+                    <TableCell>
+                      {format(dataInicio, 'MMM/yyyy', { locale: ptBR })}
+                    </TableCell>
+                    <TableCell>
+                      <span className={isExpired ? 'text-destructive font-medium' : ''}>
+                        {format(dataFim, 'MMM/yyyy', { locale: ptBR })}
+                      </span>
+                      {isExpired && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium bg-destructive text-destructive-foreground">
+                          Expirado
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir contrato?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Tem certeza que deseja excluir o contrato de <strong>{contract.cliente}</strong> 
+                              ({contract.produto} - {contract.operadora})? 
+                              Esta ação não pode ser desfeita.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => onDelete(contract.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            ))}
           </TableBody>
         </Table>
       </div>

@@ -14,6 +14,123 @@ export type Database = {
   }
   public: {
     Tables: {
+      apuracao_itens: {
+        Row: {
+          apuracao_id: string
+          cliente_mae: string
+          comissao: number | null
+          contract_id: string | null
+          created_at: string | null
+          id: string
+          mes_recebimento: string
+          mes_vigencia: number | null
+          nf_liquido: number
+          nome_ev: string | null
+          operadora: string
+          produto: string
+          status: string
+          taxa: number | null
+        }
+        Insert: {
+          apuracao_id: string
+          cliente_mae: string
+          comissao?: number | null
+          contract_id?: string | null
+          created_at?: string | null
+          id?: string
+          mes_recebimento: string
+          mes_vigencia?: number | null
+          nf_liquido: number
+          nome_ev?: string | null
+          operadora: string
+          produto: string
+          status: string
+          taxa?: number | null
+        }
+        Update: {
+          apuracao_id?: string
+          cliente_mae?: string
+          comissao?: number | null
+          contract_id?: string | null
+          created_at?: string | null
+          id?: string
+          mes_recebimento?: string
+          mes_vigencia?: number | null
+          nf_liquido?: number
+          nome_ev?: string | null
+          operadora?: string
+          produto?: string
+          status?: string
+          taxa?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apuracao_itens_apuracao_id_fkey"
+            columns: ["apuracao_id"]
+            isOneToOne: false
+            referencedRelation: "apuracoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "apuracao_itens_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "ev_contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      apuracoes: {
+        Row: {
+          count_expirados: number
+          count_nao_encontrados: number
+          count_pre_vigencia: number
+          count_validos: number
+          created_at: string | null
+          created_by: string | null
+          data_processamento: string | null
+          id: string
+          mes_referencia: string
+          nome: string
+          total_comissao_valida: number
+          total_expirado: number
+          total_nao_encontrado: number
+          total_processado: number
+        }
+        Insert: {
+          count_expirados?: number
+          count_nao_encontrados?: number
+          count_pre_vigencia?: number
+          count_validos?: number
+          created_at?: string | null
+          created_by?: string | null
+          data_processamento?: string | null
+          id?: string
+          mes_referencia: string
+          nome: string
+          total_comissao_valida?: number
+          total_expirado?: number
+          total_nao_encontrado?: number
+          total_processado?: number
+        }
+        Update: {
+          count_expirados?: number
+          count_nao_encontrados?: number
+          count_pre_vigencia?: number
+          count_validos?: number
+          created_at?: string | null
+          created_by?: string | null
+          data_processamento?: string | null
+          id?: string
+          mes_referencia?: string
+          nome?: string
+          total_comissao_valida?: number
+          total_expirado?: number
+          total_nao_encontrado?: number
+          total_processado?: number
+        }
+        Relationships: []
+      }
       ev_contracts: {
         Row: {
           atingimento: number
@@ -23,9 +140,9 @@ export type Database = {
           data_inicio: string
           id: string
           nome_ev: string
-          operadoras: string[] | null
+          operadora: string
           porte: string
-          produtos: string[] | null
+          produto: string
           updated_at: string | null
         }
         Insert: {
@@ -36,9 +153,9 @@ export type Database = {
           data_inicio: string
           id?: string
           nome_ev: string
-          operadoras?: string[] | null
+          operadora: string
           porte: string
-          produtos?: string[] | null
+          produto: string
           updated_at?: string | null
         }
         Update: {
@@ -49,9 +166,9 @@ export type Database = {
           data_inicio?: string
           id?: string
           nome_ev?: string
-          operadoras?: string[] | null
+          operadora?: string
           porte?: string
-          produtos?: string[] | null
+          produto?: string
           updated_at?: string | null
         }
         Relationships: []

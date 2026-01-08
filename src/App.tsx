@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import EVCalculator from "./pages/EVCalculator";
+import HistoricoComissoes from "./pages/HistoricoComissoes";
 import NotFound from "./pages/NotFound";
 import { AdminRoute } from "./components/AdminRoute";
 
@@ -24,6 +25,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<Index />} />
             <Route path="/ev-calculator" element={<EVCalculator />} />
+            <Route path="/historico" element={<HistoricoComissoes />} />
             <Route 
               path="/admin" 
               element={
@@ -32,7 +34,6 @@ const App = () => (
                 </AdminRoute>
               } 
             />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

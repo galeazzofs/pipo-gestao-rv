@@ -46,8 +46,8 @@ export interface Contract {
   id: string;
   nomeEV: string;
   cliente: string;
-  produtos: string[];    // Array de produtos
-  operadoras: string[];  // Array de operadoras
+  produto: string;
+  operadora: string;
   porte: Porte;
   atingimento: number;
   dataInicio: string; // ISO date string do primeiro mês de pagamento

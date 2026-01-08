@@ -1,5 +1,5 @@
 import { Contract, ExcelRow, ProcessedResult, getTaxa } from '@/lib/evCalculations';
-import { differenceInMonths, parseISO, addMonths, isAfter, isBefore } from 'date-fns';
+import { differenceInMonths, parseISO, addMonths, isAfter, isBefore, startOfMonth } from 'date-fns';
 import { normalizeString } from '@/lib/excelParser';
 
 interface ProcessingParams {
@@ -11,7 +11,6 @@ export function processCommissions({ excelData, contracts }: ProcessingParams): 
   const results: ProcessedResult[] = [];
 
   for (const row of excelData) {
-    // Passo A: Matching por chave composta
     const contract = findMatchingContract(row, contracts);
 
     if (!contract) {
@@ -23,12 +22,10 @@ export function processCommissions({ excelData, contracts }: ProcessingParams): 
       continue;
     }
 
-    // Passo B: Validação de Vigência
-    const dataInicio = parseISO(contract.dataInicio);
+    const dataInicio = parseISO(`${contract.dataInicio}-01`);
     const dataFim = addMonths(dataInicio, 12);
-    const dataRecebimento = row.dataRecebimento;
+    const dataRecebimento = startOfMonth(row.dataRecebimento);
 
-    // Se data de recebimento é anterior ao início
     if (isBefore(dataRecebimento, dataInicio)) {
       results.push({
         excelRow: row,
@@ -38,7 +35,6 @@ export function processCommissions({ excelData, contracts }: ProcessingParams): 
       continue;
     }
 
-    // Se data de recebimento é posterior ao fim (12 meses)
     if (isAfter(dataRecebimento, dataFim)) {
       results.push({
         excelRow: row,
@@ -48,11 +44,8 @@ export function processCommissions({ excelData, contracts }: ProcessingParams): 
       continue;
     }
 
-    // Passo C: Cálculo da comissão
     const taxa = getTaxa(contract.porte, contract.atingimento);
     const comissao = row.nfLiquido * taxa;
-    
-    // Calcula em qual mês da vigência estamos (1 a 12)
     const mesVigencia = differenceInMonths(dataRecebimento, dataInicio) + 1;
 
     results.push({
@@ -73,47 +66,36 @@ function findMatchingContract(row: ExcelRow, contracts: Contract[]): Contract | 
   const normalizedProduto = normalizeString(row.produto);
   const normalizedOperadora = normalizeString(row.operadora);
 
-  // Busca contrato onde:
-  // 1. Cliente bate exatamente
-  // 2. Produto do Excel existe no array de produtos do contrato
-  // 3. Operadora do Excel existe no array de operadoras do contrato
   return contracts.find(c => {
     const clienteMatch = normalizeString(c.cliente) === normalizedCliente;
-    const produtoMatch = c.produtos.some(p => normalizeString(p) === normalizedProduto);
-    const operadoraMatch = c.operadoras.some(o => normalizeString(o) === normalizedOperadora);
-    
+    const produtoMatch = normalizeString(c.produto) === normalizedProduto;
+    const operadoraMatch = normalizeString(c.operadora) === normalizedOperadora;
     return clienteMatch && produtoMatch && operadoraMatch;
   }) || null;
 }
 
-// Agrupa resultados por mês
 export function groupByMonth(results: ProcessedResult[]): Record<string, ProcessedResult[]> {
   return results.reduce((acc, result) => {
     const mes = result.excelRow.mesRecebimento;
-    if (!acc[mes]) {
-      acc[mes] = [];
-    }
+    if (!acc[mes]) acc[mes] = [];
     acc[mes].push(result);
     return acc;
   }, {} as Record<string, ProcessedResult[]>);
 }
 
-// Agrupa resultados por EV
 export function groupByEV(results: ProcessedResult[]): Record<string, ProcessedResult[]> {
   return results.reduce((acc, result) => {
     const ev = result.contract?.nomeEV || 'Sem EV';
-    if (!acc[ev]) {
-      acc[ev] = [];
-    }
+    if (!acc[ev]) acc[ev] = [];
     acc[ev].push(result);
     return acc;
   }, {} as Record<string, ProcessedResult[]>);
 }
 
-// Calcula totais
 export function calculateTotals(results: ProcessedResult[]) {
   const validos = results.filter(r => r.status === 'valido');
-  const expirados = results.filter(r => r.status === 'expirado' || r.status === 'pre_vigencia');
+  const expirados = results.filter(r => r.status === 'expirado');
+  const preVigencia = results.filter(r => r.status === 'pre_vigencia');
   const naoEncontrados = results.filter(r => r.status === 'nao_encontrado');
 
   return {
@@ -123,6 +105,7 @@ export function calculateTotals(results: ProcessedResult[]) {
     totalNaoEncontrado: naoEncontrados.reduce((sum, r) => sum + r.excelRow.nfLiquido, 0),
     countValidos: validos.length,
     countExpirados: expirados.length,
-    countNaoEncontrados: naoEncontrados.length
+    countNaoEncontrados: naoEncontrados.length,
+    countPreVigencia: preVigencia.length
   };
 }

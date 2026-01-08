@@ -8,7 +8,6 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import EVCalculator from "./pages/EVCalculator";
-import ApuracoesHistorico from "./pages/ApuracoesHistorico";
 import NotFound from "./pages/NotFound";
 import { AdminRoute } from "./components/AdminRoute";
 
@@ -25,8 +24,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<Index />} />
             <Route path="/ev-calculator" element={<EVCalculator />} />
-            <Route path="/apuracoes" element={<ApuracoesHistorico />} />
-            <Route
+            <Route 
               path="/admin" 
               element={
                 <AdminRoute>

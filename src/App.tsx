@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
+import EVCalculator from "./pages/EVCalculator";
 import NotFound from "./pages/NotFound";
 import { AdminRoute } from "./components/AdminRoute";
 
@@ -22,6 +23,7 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<Index />} />
+            <Route path="/ev-calculator" element={<EVCalculator />} />
             <Route 
               path="/admin" 
               element={

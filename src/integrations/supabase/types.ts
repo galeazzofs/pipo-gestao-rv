@@ -23,9 +23,9 @@ export type Database = {
           data_inicio: string
           id: string
           nome_ev: string
-          operadora: string
+          operadoras: string[] | null
           porte: string
-          produto: string
+          produtos: string[] | null
           updated_at: string | null
         }
         Insert: {
@@ -36,9 +36,9 @@ export type Database = {
           data_inicio: string
           id?: string
           nome_ev: string
-          operadora: string
+          operadoras?: string[] | null
           porte: string
-          produto: string
+          produtos?: string[] | null
           updated_at?: string | null
         }
         Update: {
@@ -49,9 +49,9 @@ export type Database = {
           data_inicio?: string
           id?: string
           nome_ev?: string
-          operadora?: string
+          operadoras?: string[] | null
           porte?: string
-          produto?: string
+          produtos?: string[] | null
           updated_at?: string | null
         }
         Relationships: []

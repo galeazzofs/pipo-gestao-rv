@@ -73,30 +73,17 @@ function findMatchingContract(row: ExcelRow, contracts: Contract[]): Contract | 
   const normalizedProduto = normalizeString(row.produto);
   const normalizedOperadora = normalizeString(row.operadora);
 
-  // Busca match exato por todas as chaves
-  let match = contracts.find(c => 
-    normalizeString(c.cliente) === normalizedCliente &&
-    normalizeString(c.produto) === normalizedProduto &&
-    normalizeString(c.operadora) === normalizedOperadora
-  );
-
-  if (match) return match;
-
-  // Busca match parcial (cliente + produto ou cliente + operadora)
-  match = contracts.find(c => 
-    normalizeString(c.cliente) === normalizedCliente &&
-    (normalizeString(c.produto) === normalizedProduto || 
-     normalizeString(c.operadora) === normalizedOperadora)
-  );
-
-  if (match) return match;
-
-  // Busca apenas por cliente como fallback
-  match = contracts.find(c => 
-    normalizeString(c.cliente) === normalizedCliente
-  );
-
-  return match || null;
+  // Busca contrato onde:
+  // 1. Cliente bate exatamente
+  // 2. Produto do Excel existe no array de produtos do contrato
+  // 3. Operadora do Excel existe no array de operadoras do contrato
+  return contracts.find(c => {
+    const clienteMatch = normalizeString(c.cliente) === normalizedCliente;
+    const produtoMatch = c.produtos.some(p => normalizeString(p) === normalizedProduto);
+    const operadoraMatch = c.operadoras.some(o => normalizeString(o) === normalizedOperadora);
+    
+    return clienteMatch && produtoMatch && operadoraMatch;
+  }) || null;
 }
 
 // Agrupa resultados por mês

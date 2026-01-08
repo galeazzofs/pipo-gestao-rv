@@ -3,8 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Contract, Porte } from '@/lib/evCalculations';
-import { Plus, Loader2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { Contract, Porte, PRODUTOS_DISPONIVEIS } from '@/lib/evCalculations';
+import { Plus, Loader2, X } from 'lucide-react';
 
 interface ContractFormProps {
   onSubmit: (contract: Omit<Contract, 'id'>) => Promise<unknown> | void;
@@ -17,19 +19,39 @@ export function ContractForm({ onSubmit, existingEVNames }: ContractFormProps) {
   const [nomeEV, setNomeEV] = useState('');
   const [customEV, setCustomEV] = useState('');
   const [cliente, setCliente] = useState('');
-  const [produto, setProduto] = useState('');
-  const [operadora, setOperadora] = useState('');
+  const [produtos, setProdutos] = useState<string[]>([]);
+  const [operadoras, setOperadoras] = useState<string[]>([]);
+  const [novaOperadora, setNovaOperadora] = useState('');
   const [porte, setPorte] = useState<Porte>('PP/P');
   const [atingimento, setAtingimento] = useState('100');
   const [dataInicio, setDataInicio] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleProdutoToggle = (produto: string) => {
+    setProdutos(prev => 
+      prev.includes(produto) 
+        ? prev.filter(p => p !== produto)
+        : [...prev, produto]
+    );
+  };
+
+  const handleAddOperadora = () => {
+    if (novaOperadora.trim() && !operadoras.includes(novaOperadora.trim())) {
+      setOperadoras(prev => [...prev, novaOperadora.trim()]);
+      setNovaOperadora('');
+    }
+  };
+
+  const handleRemoveOperadora = (operadora: string) => {
+    setOperadoras(prev => prev.filter(o => o !== operadora));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const evName = nomeEV === '__custom__' ? customEV : nomeEV;
     
-    if (!evName || !cliente || !produto || !operadora || !dataInicio) {
+    if (!evName || !cliente || produtos.length === 0 || operadoras.length === 0 || !dataInicio) {
       return;
     }
 
@@ -39,8 +61,8 @@ export function ContractForm({ onSubmit, existingEVNames }: ContractFormProps) {
       await onSubmit({
         nomeEV: evName,
         cliente,
-        produto,
-        operadora,
+        produtos,
+        operadoras,
         porte,
         atingimento: parseFloat(atingimento) || 100,
         dataInicio: `${dataInicio}-01`
@@ -50,8 +72,9 @@ export function ContractForm({ onSubmit, existingEVNames }: ContractFormProps) {
       setNomeEV('');
       setCustomEV('');
       setCliente('');
-      setProduto('');
-      setOperadora('');
+      setProdutos([]);
+      setOperadoras([]);
+      setNovaOperadora('');
       setPorte('PP/P');
       setAtingimento('100');
       setDataInicio('');
@@ -102,32 +125,6 @@ export function ContractForm({ onSubmit, existingEVNames }: ContractFormProps) {
           />
         </div>
 
-        {/* Produto */}
-        <div className="space-y-2">
-          <Label htmlFor="produto">Produto</Label>
-          <Input
-            id="produto"
-            placeholder="Nome do produto"
-            value={produto}
-            onChange={(e) => setProduto(e.target.value)}
-            className="input-field"
-            required
-          />
-        </div>
-
-        {/* Operadora */}
-        <div className="space-y-2">
-          <Label htmlFor="operadora">Operadora</Label>
-          <Input
-            id="operadora"
-            placeholder="Nome da operadora"
-            value={operadora}
-            onChange={(e) => setOperadora(e.target.value)}
-            className="input-field"
-            required
-          />
-        </div>
-
         {/* Porte */}
         <div className="space-y-2">
           <Label htmlFor="porte">Porte</Label>
@@ -170,6 +167,69 @@ export function ContractForm({ onSubmit, existingEVNames }: ContractFormProps) {
             className="input-field"
             required
           />
+        </div>
+      </div>
+
+      {/* Produtos - Checkboxes */}
+      <div className="space-y-3">
+        <Label>Produtos (selecione um ou mais)</Label>
+        <div className="flex flex-wrap gap-4">
+          {PRODUTOS_DISPONIVEIS.map(produto => (
+            <div key={produto} className="flex items-center space-x-2">
+              <Checkbox
+                id={`produto-${produto}`}
+                checked={produtos.includes(produto)}
+                onCheckedChange={() => handleProdutoToggle(produto)}
+              />
+              <Label 
+                htmlFor={`produto-${produto}`} 
+                className="text-sm font-normal cursor-pointer"
+              >
+                {produto}
+              </Label>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Operadoras - Tags */}
+      <div className="space-y-3">
+        <Label>Operadoras</Label>
+        <div className="flex flex-wrap gap-2 min-h-[32px]">
+          {operadoras.map(operadora => (
+            <Badge key={operadora} variant="secondary" className="px-3 py-1 text-sm">
+              {operadora}
+              <button
+                type="button"
+                onClick={() => handleRemoveOperadora(operadora)}
+                className="ml-2 hover:text-destructive"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <Input
+            placeholder="Nome da operadora"
+            value={novaOperadora}
+            onChange={(e) => setNovaOperadora(e.target.value)}
+            className="input-field max-w-xs"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddOperadora();
+              }
+            }}
+          />
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={handleAddOperadora}
+            disabled={!novaOperadora.trim()}
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
         </div>
       </div>
 

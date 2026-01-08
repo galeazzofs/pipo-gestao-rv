@@ -33,12 +33,21 @@ export const MATRIZ_TAXAS: Record<string, Record<string, number>> = {
 
 export type Porte = 'PP/P' | 'M' | 'G+' | 'Enterprise' | 'Inside Sales';
 
+// Lista de produtos pré-definidos
+export const PRODUTOS_DISPONIVEIS = [
+  'Saúde',
+  'Odonto', 
+  'Vida',
+  'Mental',
+  'Físico'
+] as const;
+
 export interface Contract {
   id: string;
   nomeEV: string;
   cliente: string;
-  produto: string;
-  operadora: string;
+  produtos: string[];    // Array de produtos
+  operadoras: string[];  // Array de operadoras
   porte: Porte;
   atingimento: number;
   dataInicio: string; // ISO date string do primeiro mês de pagamento

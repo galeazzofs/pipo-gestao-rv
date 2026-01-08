@@ -10,7 +10,8 @@ import {
   ArrowRight,
   Zap,
   BarChart3,
-  Users
+  Users,
+  TrendingUp
 } from 'lucide-react';
 
 const Landing = () => {
@@ -27,12 +28,20 @@ const Landing = () => {
       borderColor: 'hover:border-blue-500/30',
     },
     {
-      title: 'Calculadora EV',
-      description: 'Gerencie contratos de vendas, importe dados via Excel e apure comissões mensais dos EVs.',
+      title: 'Base de Contratos',
+      description: 'Gerencie sua carteira de contratos de EVs, importe dados via Excel e acompanhe vigências.',
       icon: FileSpreadsheet,
-      href: '/ev-calculator',
+      href: '/ev/contratos',
       color: 'bg-emerald-500/10 text-emerald-600',
       borderColor: 'hover:border-emerald-500/30',
+    },
+    {
+      title: 'Minha Previsibilidade',
+      description: 'Veja quanto ainda tem a receber dos seus contratos ativos e identifique riscos de churn.',
+      icon: TrendingUp,
+      href: '/previsibilidade',
+      color: 'bg-cyan-500/10 text-cyan-600',
+      borderColor: 'hover:border-cyan-500/30',
     },
     {
       title: 'Histórico',

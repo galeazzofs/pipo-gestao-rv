@@ -1,4 +1,7 @@
-import { Contract, ExcelRow, ProcessedResult, getTaxa } from '@/lib/evCalculations';
+import { Contract, ExcelRow, getTaxa } from '@/lib/evCalculations';
+import type { ProcessedResult } from '@/lib/evCalculations';
+
+export type { ProcessedResult };
 import { differenceInMonths, parseISO, addMonths, isAfter, isBefore } from 'date-fns';
 import { normalizeString } from '@/lib/excelParser';
 

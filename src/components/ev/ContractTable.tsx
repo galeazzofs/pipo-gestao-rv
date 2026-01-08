@@ -3,6 +3,7 @@ import { format, addMonths, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Trash2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -49,8 +50,8 @@ export function ContractTable({ contracts, onDelete }: ContractTableProps) {
             <TableRow className="bg-muted/50">
               <TableHead>EV</TableHead>
               <TableHead>Cliente</TableHead>
-              <TableHead>Produto</TableHead>
-              <TableHead>Operadora</TableHead>
+              <TableHead>Produtos</TableHead>
+              <TableHead>Operadoras</TableHead>
               <TableHead>Porte</TableHead>
               <TableHead>Ating.</TableHead>
               <TableHead>Taxa</TableHead>
@@ -73,8 +74,24 @@ export function ContractTable({ contracts, onDelete }: ContractTableProps) {
                 >
                   <TableCell className="font-medium">{contract.nomeEV}</TableCell>
                   <TableCell>{contract.cliente}</TableCell>
-                  <TableCell>{contract.produto}</TableCell>
-                  <TableCell>{contract.operadora}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {contract.produtos.map(p => (
+                        <Badge key={p} variant="outline" className="text-xs">
+                          {p}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {contract.operadoras.map(o => (
+                        <Badge key={o} variant="secondary" className="text-xs">
+                          {o}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <span className="px-2 py-1 rounded-md bg-muted text-xs font-medium">
                       {contract.porte}

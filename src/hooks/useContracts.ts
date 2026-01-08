@@ -27,8 +27,8 @@ export function useContracts() {
           id: row.id,
           nomeEV: row.nome_ev,
           cliente: row.cliente,
-          produto: row.produto,
-          operadora: row.operadora,
+          produtos: row.produtos || [],
+          operadoras: row.operadoras || [],
           porte: row.porte as Porte,
           atingimento: Number(row.atingimento),
           dataInicio: row.data_inicio
@@ -55,8 +55,8 @@ export function useContracts() {
         .insert({
           nome_ev: contract.nomeEV,
           cliente: contract.cliente,
-          produto: contract.produto,
-          operadora: contract.operadora,
+          produtos: contract.produtos,
+          operadoras: contract.operadoras,
           porte: contract.porte,
           atingimento: contract.atingimento,
           data_inicio: contract.dataInicio,
@@ -86,8 +86,8 @@ export function useContracts() {
       const updateData: Record<string, unknown> = {};
       if (updates.nomeEV !== undefined) updateData.nome_ev = updates.nomeEV;
       if (updates.cliente !== undefined) updateData.cliente = updates.cliente;
-      if (updates.produto !== undefined) updateData.produto = updates.produto;
-      if (updates.operadora !== undefined) updateData.operadora = updates.operadora;
+      if (updates.produtos !== undefined) updateData.produtos = updates.produtos;
+      if (updates.operadoras !== undefined) updateData.operadoras = updates.operadoras;
       if (updates.porte !== undefined) updateData.porte = updates.porte;
       if (updates.atingimento !== undefined) updateData.atingimento = updates.atingimento;
       if (updates.dataInicio !== undefined) updateData.data_inicio = updates.dataInicio;
@@ -136,11 +136,12 @@ export function useContracts() {
     const normalize = (str: string) => 
       str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
     
-    return contracts.find(c => 
-      normalize(c.cliente) === normalize(cliente) &&
-      normalize(c.produto) === normalize(produto) &&
-      normalize(c.operadora) === normalize(operadora)
-    );
+    return contracts.find(c => {
+      const clienteMatch = normalize(c.cliente) === normalize(cliente);
+      const produtoMatch = c.produtos.some(p => normalize(p) === normalize(produto));
+      const operadoraMatch = c.operadoras.some(o => normalize(o) === normalize(operadora));
+      return clienteMatch && produtoMatch && operadoraMatch;
+    });
   }, [contracts]);
 
   const getUniqueEVNames = useCallback(() => {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Contract, Porte } from '@/lib/evCalculations';
+import { Contract, Porte, ContractLine } from '@/lib/evCalculations';
 import { toast } from 'sonner';
 
 export function useContracts() {
@@ -27,8 +27,8 @@ export function useContracts() {
           id: row.id,
           nomeEV: row.nome_ev,
           cliente: row.cliente,
-          produtos: row.produtos || [],
-          operadoras: row.operadoras || [],
+          produto: row.produto,
+          operadora: row.operadora,
           porte: row.porte as Porte,
           atingimento: Number(row.atingimento),
           dataInicio: row.data_inicio
@@ -55,8 +55,8 @@ export function useContracts() {
         .insert({
           nome_ev: contract.nomeEV,
           cliente: contract.cliente,
-          produtos: contract.produtos,
-          operadoras: contract.operadoras,
+          produto: contract.produto,
+          operadora: contract.operadora,
           porte: contract.porte,
           atingimento: contract.atingimento,
           data_inicio: contract.dataInicio,
@@ -81,13 +81,52 @@ export function useContracts() {
     }
   }, [fetchContracts]);
 
+  // Adiciona múltiplos contratos de uma vez (cadastro em lote)
+  const addMultipleContracts = useCallback(async (
+    baseContract: { nomeEV: string; cliente: string; porte: Porte; atingimento: number },
+    lines: ContractLine[]
+  ) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const inserts = lines.map(line => ({
+        nome_ev: baseContract.nomeEV,
+        cliente: baseContract.cliente,
+        porte: baseContract.porte,
+        atingimento: baseContract.atingimento,
+        produto: line.produto,
+        operadora: line.operadora,
+        data_inicio: line.dataInicio,
+        created_by: user?.id
+      }));
+
+      const { error } = await supabase
+        .from('ev_contracts')
+        .insert(inserts);
+
+      if (error) {
+        console.error('Erro ao adicionar contratos:', error);
+        toast.error('Erro ao adicionar contratos');
+        return false;
+      }
+
+      toast.success(`${lines.length} contrato(s) adicionado(s) com sucesso`);
+      await fetchContracts();
+      return true;
+    } catch (error) {
+      console.error('Erro ao adicionar contratos:', error);
+      toast.error('Erro ao adicionar contratos');
+      return false;
+    }
+  }, [fetchContracts]);
+
   const updateContract = useCallback(async (id: string, updates: Partial<Omit<Contract, 'id'>>) => {
     try {
       const updateData: Record<string, unknown> = {};
       if (updates.nomeEV !== undefined) updateData.nome_ev = updates.nomeEV;
       if (updates.cliente !== undefined) updateData.cliente = updates.cliente;
-      if (updates.produtos !== undefined) updateData.produtos = updates.produtos;
-      if (updates.operadoras !== undefined) updateData.operadoras = updates.operadoras;
+      if (updates.produto !== undefined) updateData.produto = updates.produto;
+      if (updates.operadora !== undefined) updateData.operadora = updates.operadora;
       if (updates.porte !== undefined) updateData.porte = updates.porte;
       if (updates.atingimento !== undefined) updateData.atingimento = updates.atingimento;
       if (updates.dataInicio !== undefined) updateData.data_inicio = updates.dataInicio;
@@ -138,8 +177,8 @@ export function useContracts() {
     
     return contracts.find(c => {
       const clienteMatch = normalize(c.cliente) === normalize(cliente);
-      const produtoMatch = c.produtos.some(p => normalize(p) === normalize(produto));
-      const operadoraMatch = c.operadoras.some(o => normalize(o) === normalize(operadora));
+      const produtoMatch = normalize(c.produto) === normalize(produto);
+      const operadoraMatch = normalize(c.operadora) === normalize(operadora);
       return clienteMatch && produtoMatch && operadoraMatch;
     });
   }, [contracts]);
@@ -152,6 +191,7 @@ export function useContracts() {
     contracts,
     isLoading,
     addContract,
+    addMultipleContracts,
     updateContract,
     deleteContract,
     getContractByKey,

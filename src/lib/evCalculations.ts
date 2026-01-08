@@ -46,11 +46,19 @@ export interface Contract {
   id: string;
   nomeEV: string;
   cliente: string;
-  produtos: string[];    // Array de produtos
-  operadoras: string[];  // Array de operadoras
+  produto: string;    // Campo único
+  operadora: string;  // Campo único
   porte: Porte;
   atingimento: number;
   dataInicio: string; // ISO date string do primeiro mês de pagamento
+}
+
+// Interface para linha de contrato (usado no cadastro em lote)
+export interface ContractLine {
+  id: string; // ID temporário para UI
+  produto: string;
+  operadora: string;
+  dataInicio: string;
 }
 
 export interface ExcelRow {
@@ -71,6 +79,38 @@ export interface ProcessedResult {
   mesVigencia?: number; // Mês X de 12
   taxa?: number;
   comissao?: number;
+}
+
+// Interface para apuração salva
+export interface ApuracaoSalva {
+  id: string;
+  nome: string;
+  mesReferencia: string;
+  dataProcessamento: string;
+  totalProcessado: number;
+  totalComissaoValida: number;
+  totalExpirado: number;
+  totalNaoEncontrado: number;
+  countValidos: number;
+  countExpirados: number;
+  countNaoEncontrados: number;
+  countPreVigencia: number;
+}
+
+export interface ApuracaoItem {
+  id: string;
+  apuracaoId: string;
+  clienteMae: string;
+  produto: string;
+  operadora: string;
+  nfLiquido: number;
+  mesRecebimento: string;
+  status: ProcessedStatus;
+  contractId: string | null;
+  nomeEV: string | null;
+  mesVigencia: number | null;
+  taxa: number | null;
+  comissao: number | null;
 }
 
 // Determina a faixa de atingimento para buscar na matriz

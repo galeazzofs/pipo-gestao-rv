@@ -84,13 +84,9 @@ export function ContractTable({ contracts, onDelete }: ContractTableProps) {
                     className={`${isExpired ? 'opacity-50 bg-destructive/5' : ''} ${index === 0 ? 'border-t-2' : ''}`}
                   >
                     <TableCell className="font-medium">{contract.nomeEV}</TableCell>
-                    <TableCell>
-                      {index === 0 ? (
-                        <span className="font-medium">{cliente}</span>
-                      ) : (
-                        <span className="text-muted-foreground">↳</span>
-                      )}
-                    </TableCell>
+                  <TableCell>
+                    <span className="font-medium">{contract.cliente}</span>
+                  </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-xs">
                         {contract.produto}

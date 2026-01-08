@@ -94,6 +94,16 @@ const HistoricoComissoes = () => {
     }
   };
 
+  const formatMesReferencia = (mesRef: string) => {
+    try {
+      // mesRef pode vir como "2026-01" ou "2026-01-01"
+      const date = parseISO(mesRef.length === 7 ? `${mesRef}-01` : mesRef);
+      return format(date, "MMM/yyyy", { locale: ptBR });
+    } catch {
+      return mesRef;
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'valido':
@@ -227,7 +237,7 @@ const HistoricoComissoes = () => {
                             <div>
                               <h3 className="font-semibold text-foreground">{apuracao.nome}</h3>
                               <p className="text-sm text-muted-foreground">
-                                Processado em {formatDate(apuracao.dataProcessamento)}
+                                Ref: {formatMesReferencia(apuracao.mesReferencia)} • Processado em {formatDate(apuracao.dataProcessamento)}
                               </p>
                             </div>
                           </button>

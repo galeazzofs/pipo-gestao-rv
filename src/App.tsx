@@ -2,13 +2,15 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Landing from "./pages/Landing";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
-import EVCalculator from "./pages/EVCalculator";
+import EVContratos from "./pages/EVContratos";
+import EVApuracao from "./pages/EVApuracao";
+import Previsibilidade from "./pages/Previsibilidade";
 import HistoricoComissoes from "./pages/HistoricoComissoes";
 import NotFound from "./pages/NotFound";
 import { AdminRoute } from "./components/AdminRoute";
@@ -26,7 +28,11 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<Landing />} />
             <Route path="/calculadora-cn" element={<Index />} />
-            <Route path="/ev-calculator" element={<EVCalculator />} />
+            <Route path="/ev/contratos" element={<EVContratos />} />
+            <Route path="/ev/apuracao" element={<EVApuracao />} />
+            <Route path="/previsibilidade" element={<Previsibilidade />} />
+            {/* Redirect old route */}
+            <Route path="/ev-calculator" element={<Navigate to="/ev/contratos" replace />} />
             <Route path="/historico" element={<HistoricoComissoes />} />
             <Route 
               path="/admin" 

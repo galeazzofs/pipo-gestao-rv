@@ -1,7 +1,12 @@
-import { CommissionCalculator } from '@/components/CommissionCalculator';
+import { CNCalculator } from '@/components/CNCalculator';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 const Index = () => {
-  return <CommissionCalculator />;
+  return (
+    <ProtectedRoute>
+      <CNCalculator />
+    </ProtectedRoute>
+  );
 };
 
 export default Index;

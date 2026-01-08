@@ -2,3 +2,6 @@ project_id = "bxqihukgmrzkclfinnfr"
 
 [functions.create-profile]
 verify_jwt = false
+
+[functions.setup-admin]
+verify_jwt = false

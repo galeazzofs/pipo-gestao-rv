@@ -4,14 +4,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Contract, Porte } from '@/lib/evCalculations';
-import { Plus } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
 
 interface ContractFormProps {
-  onSubmit: (contract: Omit<Contract, 'id'>) => void;
+  onSubmit: (contract: Omit<Contract, 'id'>) => Promise<unknown> | void;
   existingEVNames: string[];
 }
 
-const PORTES: Porte[] = ['PP/P', 'M', 'G+', 'Enterprise'];
+const PORTES: Porte[] = ['PP/P', 'Inside Sales', 'M', 'G+', 'Enterprise'];
 
 export function ContractForm({ onSubmit, existingEVNames }: ContractFormProps) {
   const [nomeEV, setNomeEV] = useState('');
@@ -22,8 +22,9 @@ export function ContractForm({ onSubmit, existingEVNames }: ContractFormProps) {
   const [porte, setPorte] = useState<Porte>('PP/P');
   const [atingimento, setAtingimento] = useState('100');
   const [dataInicio, setDataInicio] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const evName = nomeEV === '__custom__' ? customEV : nomeEV;
@@ -32,25 +33,31 @@ export function ContractForm({ onSubmit, existingEVNames }: ContractFormProps) {
       return;
     }
 
-    onSubmit({
-      nomeEV: evName,
-      cliente,
-      produto,
-      operadora,
-      porte,
-      atingimento: parseFloat(atingimento) || 100,
-      dataInicio: `${dataInicio}-01` // Converte "2025-01" para "2025-01-01"
-    });
+    setIsSubmitting(true);
 
-    // Reset form
-    setNomeEV('');
-    setCustomEV('');
-    setCliente('');
-    setProduto('');
-    setOperadora('');
-    setPorte('PP/P');
-    setAtingimento('100');
-    setDataInicio('');
+    try {
+      await onSubmit({
+        nomeEV: evName,
+        cliente,
+        produto,
+        operadora,
+        porte,
+        atingimento: parseFloat(atingimento) || 100,
+        dataInicio: `${dataInicio}-01`
+      });
+
+      // Reset form
+      setNomeEV('');
+      setCustomEV('');
+      setCliente('');
+      setProduto('');
+      setOperadora('');
+      setPorte('PP/P');
+      setAtingimento('100');
+      setDataInicio('');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -166,9 +173,13 @@ export function ContractForm({ onSubmit, existingEVNames }: ContractFormProps) {
         </div>
       </div>
 
-      <Button type="submit" className="btn-primary w-full md:w-auto">
-        <Plus className="w-4 h-4 mr-2" />
-        Adicionar Contrato
+      <Button type="submit" className="btn-primary w-full md:w-auto" disabled={isSubmitting}>
+        {isSubmitting ? (
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+        ) : (
+          <Plus className="w-4 h-4 mr-2" />
+        )}
+        {isSubmitting ? 'Salvando...' : 'Adicionar Contrato'}
       </Button>
     </form>
   );

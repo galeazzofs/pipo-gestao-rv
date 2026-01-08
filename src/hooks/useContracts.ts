@@ -1,55 +1,136 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Contract } from '@/lib/evCalculations';
-
-const STORAGE_KEY = 'ev-contracts';
+import { supabase } from '@/integrations/supabase/client';
+import { Contract, Porte } from '@/lib/evCalculations';
+import { toast } from 'sonner';
 
 export function useContracts() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Carrega contratos do localStorage na inicialização
-  useEffect(() => {
+  // Carrega contratos do banco na inicialização
+  const fetchContracts = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setContracts(JSON.parse(stored));
+      const { data, error } = await supabase
+        .from('ev_contracts')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Erro ao carregar contratos:', error);
+        toast.error('Erro ao carregar contratos');
+        return;
+      }
+
+      if (data) {
+        setContracts(data.map(row => ({
+          id: row.id,
+          nomeEV: row.nome_ev,
+          cliente: row.cliente,
+          produto: row.produto,
+          operadora: row.operadora,
+          porte: row.porte as Porte,
+          atingimento: Number(row.atingimento),
+          dataInicio: row.data_inicio
+        })));
       }
     } catch (error) {
       console.error('Erro ao carregar contratos:', error);
+      toast.error('Erro ao carregar contratos');
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Salva contratos no localStorage quando mudam
   useEffect(() => {
-    if (!isLoading) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(contracts));
-      } catch (error) {
-        console.error('Erro ao salvar contratos:', error);
+    fetchContracts();
+  }, [fetchContracts]);
+
+  const addContract = useCallback(async (contract: Omit<Contract, 'id'>) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { data, error } = await supabase
+        .from('ev_contracts')
+        .insert({
+          nome_ev: contract.nomeEV,
+          cliente: contract.cliente,
+          produto: contract.produto,
+          operadora: contract.operadora,
+          porte: contract.porte,
+          atingimento: contract.atingimento,
+          data_inicio: contract.dataInicio,
+          created_by: user?.id
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Erro ao adicionar contrato:', error);
+        toast.error('Erro ao adicionar contrato');
+        return null;
       }
+
+      toast.success('Contrato adicionado com sucesso');
+      await fetchContracts();
+      return data;
+    } catch (error) {
+      console.error('Erro ao adicionar contrato:', error);
+      toast.error('Erro ao adicionar contrato');
+      return null;
     }
-  }, [contracts, isLoading]);
+  }, [fetchContracts]);
 
-  const addContract = useCallback((contract: Omit<Contract, 'id'>) => {
-    const newContract: Contract = {
-      ...contract,
-      id: crypto.randomUUID()
-    };
-    setContracts(prev => [...prev, newContract]);
-    return newContract;
-  }, []);
+  const updateContract = useCallback(async (id: string, updates: Partial<Omit<Contract, 'id'>>) => {
+    try {
+      const updateData: Record<string, unknown> = {};
+      if (updates.nomeEV !== undefined) updateData.nome_ev = updates.nomeEV;
+      if (updates.cliente !== undefined) updateData.cliente = updates.cliente;
+      if (updates.produto !== undefined) updateData.produto = updates.produto;
+      if (updates.operadora !== undefined) updateData.operadora = updates.operadora;
+      if (updates.porte !== undefined) updateData.porte = updates.porte;
+      if (updates.atingimento !== undefined) updateData.atingimento = updates.atingimento;
+      if (updates.dataInicio !== undefined) updateData.data_inicio = updates.dataInicio;
 
-  const updateContract = useCallback((id: string, updates: Partial<Omit<Contract, 'id'>>) => {
-    setContracts(prev => 
-      prev.map(c => c.id === id ? { ...c, ...updates } : c)
-    );
-  }, []);
+      const { error } = await supabase
+        .from('ev_contracts')
+        .update(updateData)
+        .eq('id', id);
 
-  const deleteContract = useCallback((id: string) => {
-    setContracts(prev => prev.filter(c => c.id !== id));
-  }, []);
+      if (error) {
+        console.error('Erro ao atualizar contrato:', error);
+        toast.error('Erro ao atualizar contrato');
+        return;
+      }
+
+      toast.success('Contrato atualizado');
+      await fetchContracts();
+    } catch (error) {
+      console.error('Erro ao atualizar contrato:', error);
+      toast.error('Erro ao atualizar contrato');
+    }
+  }, [fetchContracts]);
+
+  const deleteContract = useCallback(async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('ev_contracts')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Erro ao excluir contrato:', error);
+        toast.error('Erro ao excluir contrato');
+        return;
+      }
+
+      toast.success('Contrato excluído');
+      await fetchContracts();
+    } catch (error) {
+      console.error('Erro ao excluir contrato:', error);
+      toast.error('Erro ao excluir contrato');
+    }
+  }, [fetchContracts]);
 
   const getContractByKey = useCallback((cliente: string, produto: string, operadora: string) => {
     const normalize = (str: string) => 
@@ -73,6 +154,7 @@ export function useContracts() {
     updateContract,
     deleteContract,
     getContractByKey,
-    getUniqueEVNames
+    getUniqueEVNames,
+    refetch: fetchContracts
   };
 }

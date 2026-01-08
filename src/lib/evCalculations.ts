@@ -1,32 +1,37 @@
 // Matriz de taxas baseada em Porte e % Atingimento
+// PP/P e Inside Sales: <50% = 7%, 50-99.9% = 8%, >=100% = 10%
+// M: <50% = 5%, 50-99.9% = 6%, >=100% = 8%
+// G+: <50% = 3%, 50-99.9% = 4%, >=100% = 6%
+// Enterprise: 4% fixo para qualquer atingimento
 export const MATRIZ_TAXAS: Record<string, Record<string, number>> = {
   'PP/P': {
-    '0-50': 0.03,
-    '51-80': 0.04,
-    '81-100': 0.05,
-    '101+': 0.06
+    '<50': 0.07,
+    '50-99.9': 0.08,
+    '>=100': 0.10
+  },
+  'Inside Sales': {
+    '<50': 0.07,
+    '50-99.9': 0.08,
+    '>=100': 0.10
   },
   'M': {
-    '0-50': 0.025,
-    '51-80': 0.035,
-    '81-100': 0.045,
-    '101+': 0.055
+    '<50': 0.05,
+    '50-99.9': 0.06,
+    '>=100': 0.08
   },
   'G+': {
-    '0-50': 0.02,
-    '51-80': 0.03,
-    '81-100': 0.04,
-    '101+': 0.05
+    '<50': 0.03,
+    '50-99.9': 0.04,
+    '>=100': 0.06
   },
   'Enterprise': {
-    '0-50': 0.015,
-    '51-80': 0.025,
-    '81-100': 0.035,
-    '101+': 0.045
+    '<50': 0.04,
+    '50-99.9': 0.04,
+    '>=100': 0.04
   }
 };
 
-export type Porte = 'PP/P' | 'M' | 'G+' | 'Enterprise';
+export type Porte = 'PP/P' | 'M' | 'G+' | 'Enterprise' | 'Inside Sales';
 
 export interface Contract {
   id: string;
@@ -61,10 +66,9 @@ export interface ProcessedResult {
 
 // Determina a faixa de atingimento para buscar na matriz
 export function getAtingimentoFaixa(atingimento: number): string {
-  if (atingimento <= 50) return '0-50';
-  if (atingimento <= 80) return '51-80';
-  if (atingimento <= 100) return '81-100';
-  return '101+';
+  if (atingimento < 50) return '<50';
+  if (atingimento < 100) return '50-99.9';
+  return '>=100';
 }
 
 // Busca a taxa na matriz

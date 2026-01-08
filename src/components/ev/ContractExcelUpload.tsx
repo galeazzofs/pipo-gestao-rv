@@ -230,7 +230,7 @@ export function ContractExcelUpload({ onContractsLoaded }: ContractExcelUploadPr
           produto,
           operadora,
           porte,
-          atingimento: Math.round(atingimento),
+          atingimento: parseFloat(atingimento.toFixed(1)),
           dataInicio
         });
       }

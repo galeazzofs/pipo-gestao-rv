@@ -7,18 +7,38 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// Secret token for admin setup - must be set as environment variable
+const SETUP_SECRET = Deno.env.get("ADMIN_SETUP_SECRET");
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // SECURITY: Verify setup secret token
+    const { email, nome, setup_secret } = await req.json();
+    
+    if (!SETUP_SECRET) {
+      console.error("ADMIN_SETUP_SECRET not configured");
+      return new Response(
+        JSON.stringify({ error: "Admin setup is not configured. Contact system administrator." }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!setup_secret || setup_secret !== SETUP_SECRET) {
+      console.warn("Invalid setup secret attempt");
+      return new Response(
+        JSON.stringify({ error: "Invalid setup credentials" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
-
-    const { email, nome } = await req.json();
 
     // Check if admin already exists
     const { data: existingRoles } = await adminClient

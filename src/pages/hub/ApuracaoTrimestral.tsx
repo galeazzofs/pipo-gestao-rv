@@ -11,6 +11,7 @@ import { ResultsDashboard } from '@/components/ev/ResultsDashboard';
 import { ResultsTable } from '@/components/ev/ResultsTable';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -42,9 +43,11 @@ import {
   Briefcase,
   Crown,
   Info,
+  TrendingUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ExcelDropzone } from '@/components/ev/ExcelDropzone';
+import { cn } from '@/lib/utils';
 
 const TRIMESTRES = [
   { value: 'Q1', label: 'Q1 (Jan-Mar)' },
@@ -55,12 +58,20 @@ const TRIMESTRES = [
 
 const ANOS = ['2024', '2025', '2026', '2027'];
 
-const MULTIPLICADORES = [
-  { value: '0', label: '0x' },
-  { value: '0.5', label: '0.5x' },
-  { value: '1', label: '1x' },
-  { value: '1.5', label: '1.5x' },
-];
+// Função para calcular multiplicador baseado no % de atingimento de MRR
+const calcularMultiplicadorMRR = (pctAtingimento: number): number => {
+  if (pctAtingimento < 80) return 0;
+  if (pctAtingimento < 95) return 0.5;
+  if (pctAtingimento < 125) return 1.0;
+  return 1.5;
+};
+
+const getMultiplicadorLabel = (mult: number): string => {
+  if (mult === 0) return 'Sem Bônus';
+  if (mult === 0.5) return '0.5x Salário';
+  if (mult === 1) return '1x Salário';
+  return '1.5x Salário';
+};
 
 interface CNRow {
   saoMeta: string;
@@ -78,7 +89,10 @@ interface CNRow {
 
 interface EVRow {
   comissaoSafra: number;
-  multiplicador: string;
+  metaMRR: string;
+  mrrRealizado: string;
+  pctAtingimento: number;
+  multiplicador: number;
   bonusEV: number;
   total: number;
 }
@@ -160,18 +174,28 @@ export default function ApuracaoTrimestral() {
     });
   };
 
-  // Handlers para EVs
+  // Handlers para EVs - Cálculo automático do multiplicador baseado em MRR
   const updateEVRow = (id: string, field: keyof EVRow, value: string | number) => {
     setEvRows(prev => {
       const ev = evs.find(e => e.id === id);
       const current = prev[id] || {
-        comissaoSafra: 0, multiplicador: '1', bonusEV: 0, total: 0
+        comissaoSafra: 0, metaMRR: '', mrrRealizado: '', 
+        pctAtingimento: 0, multiplicador: 0, bonusEV: 0, total: 0
       };
       const updated = { ...current, [field]: value };
 
-      // Recalcular bônus EV
-      const mult = parseFloat(updated.multiplicador) || 0;
-      updated.bonusEV = (ev?.salario_base || 0) * mult;
+      // Calcular % Atingimento
+      const meta = parseFloat(updated.metaMRR) || 0;
+      const realizado = parseFloat(updated.mrrRealizado) || 0;
+      updated.pctAtingimento = meta > 0 ? (realizado / meta) * 100 : 0;
+      
+      // Calcular Multiplicador automaticamente baseado no atingimento
+      updated.multiplicador = calcularMultiplicadorMRR(updated.pctAtingimento);
+      
+      // Calcular Bônus EV
+      updated.bonusEV = (ev?.salario_base || 0) * updated.multiplicador;
+      
+      // Total final = Comissão Safra + Bônus MRR
       updated.total = updated.comissaoSafra + updated.bonusEV;
 
       return { ...prev, [id]: updated };
@@ -234,17 +258,23 @@ export default function ApuracaoTrimestral() {
         
         const current = newEvRows[ev.id] || { 
           comissaoSafra: 0, 
-          multiplicador: '1', 
+          metaMRR: '',
+          mrrRealizado: '',
+          pctAtingimento: 0,
+          multiplicador: 0, 
           bonusEV: 0, 
           total: 0 
         };
         
-        const mult = parseFloat(current.multiplicador) || 0;
+        const mult = current.multiplicador;
         const bonusEV = (ev.salario_base || 0) * mult;
         
         newEvRows[ev.id] = {
           comissaoSafra,
-          multiplicador: current.multiplicador,
+          metaMRR: current.metaMRR,
+          mrrRealizado: current.mrrRealizado,
+          pctAtingimento: current.pctAtingimento,
+          multiplicador: mult,
           bonusEV,
           total: comissaoSafra + bonusEV
         };
@@ -340,7 +370,7 @@ export default function ApuracaoTrimestral() {
         itens.push({
           colaborador_id: ev.id,
           comissao_safra: row.comissaoSafra,
-          multiplicador_meta: parseFloat(row.multiplicador) || 1,
+          multiplicador_meta: row.multiplicador,
           bonus_ev: row.bonusEV,
           total_pagar: row.total,
         });
@@ -625,66 +655,142 @@ export default function ApuracaoTrimestral() {
                 </div>
               )}
 
+              {/* Card de Regras do Bônus Trimestral MRR */}
+              <div className="card-premium p-4 mb-4 flex items-start gap-3 bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900">
+                <TrendingUp className="w-5 h-5 text-amber-600 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-medium text-amber-800 dark:text-amber-300">Bônus Trimestral de MRR</p>
+                  <p className="text-amber-700 dark:text-amber-400">
+                    Multiplicador automático baseado no atingimento da meta: &lt;80% = 0x | 80-94.9% = 0.5x | 95-124.9% = 1x | ≥125% = 1.5x
+                  </p>
+                </div>
+              </div>
+
               {/* Tabela de Totais por EV + Bônus */}
               <div className="card-premium overflow-hidden">
                 <div className="p-4 border-b bg-muted/30">
-                  <h3 className="font-semibold">Resumo por EV + Bônus</h3>
+                  <h3 className="font-semibold">Resumo por EV + Bônus MRR</h3>
                 </div>
                 {evs.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
                     Nenhum EV cadastrado.
                   </div>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Executivo</TableHead>
-                        <TableHead className="text-right">Salário Base</TableHead>
-                        <TableHead className="text-right w-32">Comissão Safra</TableHead>
-                        <TableHead className="text-center w-28">Multiplicador</TableHead>
-                        <TableHead className="text-right">Bônus EV</TableHead>
-                        <TableHead className="text-right">TOTAL</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {evs.map((ev) => {
-                        const row = evRows[ev.id] || { comissaoSafra: 0, multiplicador: '1', bonusEV: 0, total: 0 };
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Executivo</TableHead>
+                          <TableHead className="text-right">Salário Base</TableHead>
+                          <TableHead className="text-right">Comissão Safra</TableHead>
+                          <TableHead className="text-right w-28">Meta MRR</TableHead>
+                          <TableHead className="text-right w-28">MRR Realizado</TableHead>
+                          <TableHead className="text-center w-36">% Atingimento</TableHead>
+                          <TableHead className="text-center">Mult.</TableHead>
+                          <TableHead className="text-right">Bônus MRR</TableHead>
+                          <TableHead className="text-right">TOTAL</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {evs.map((ev) => {
+                          const row = evRows[ev.id] || { 
+                            comissaoSafra: 0, metaMRR: '', mrrRealizado: '', 
+                            pctAtingimento: 0, multiplicador: 0, bonusEV: 0, total: 0 
+                          };
 
-                        return (
-                          <TableRow key={ev.id}>
-                            <TableCell className="font-medium">{ev.nome}</TableCell>
-                            <TableCell className="text-right text-muted-foreground">
-                              {formatCurrency(ev.salario_base)}
-                            </TableCell>
-                            <TableCell className="text-right font-medium text-success">
-                              {formatCurrency(row.comissaoSafra)}
-                            </TableCell>
-                            <TableCell>
-                              <Select
-                                value={row.multiplicador}
-                                onValueChange={(v) => updateEVRow(ev.id, 'multiplicador', v)}
-                              >
-                                <SelectTrigger className="w-24">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {MULTIPLICADORES.map((m) => (
-                                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell className="text-right font-medium">
-                              {formatCurrency(row.bonusEV)}
-                            </TableCell>
-                            <TableCell className="text-right font-bold text-success">
-                              {formatCurrency(row.total)}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                          return (
+                            <TableRow key={ev.id}>
+                              <TableCell className="font-medium">{ev.nome}</TableCell>
+                              <TableCell className="text-right text-muted-foreground">
+                                {formatCurrency(ev.salario_base)}
+                              </TableCell>
+                              <TableCell className="text-right font-medium text-success">
+                                {formatCurrency(row.comissaoSafra)}
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={row.metaMRR}
+                                  onChange={(e) => updateEVRow(ev.id, 'metaMRR', e.target.value)}
+                                  className="w-24 text-right"
+                                  placeholder="R$ 0"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={row.mrrRealizado}
+                                  onChange={(e) => updateEVRow(ev.id, 'mrrRealizado', e.target.value)}
+                                  className="w-24 text-right"
+                                  placeholder="R$ 0"
+                                />
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <div className="flex flex-col items-center gap-1.5">
+                                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                                    <div 
+                                      className={cn(
+                                        "h-full transition-all duration-300",
+                                        row.pctAtingimento >= 125 ? "bg-emerald-500" :
+                                        row.pctAtingimento >= 95 ? "bg-green-500" :
+                                        row.pctAtingimento >= 80 ? "bg-amber-500" :
+                                        "bg-red-500"
+                                      )}
+                                      style={{ width: `${Math.min(row.pctAtingimento, 150) / 1.5}%` }}
+                                    />
+                                  </div>
+                                  <span className={cn(
+                                    "text-xs font-semibold",
+                                    row.pctAtingimento >= 125 ? "text-emerald-600 dark:text-emerald-400" :
+                                    row.pctAtingimento >= 95 ? "text-green-600 dark:text-green-400" :
+                                    row.pctAtingimento >= 80 ? "text-amber-600 dark:text-amber-400" :
+                                    row.pctAtingimento > 0 ? "text-red-600 dark:text-red-400" :
+                                    "text-muted-foreground"
+                                  )}>
+                                    {row.pctAtingimento > 0 ? `${row.pctAtingimento.toFixed(1)}%` : '-'}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Badge 
+                                  variant={
+                                    row.multiplicador >= 1.5 ? "default" :
+                                    row.multiplicador >= 1 ? "secondary" :
+                                    row.multiplicador >= 0.5 ? "outline" :
+                                    "destructive"
+                                  }
+                                  className={cn(
+                                    row.multiplicador >= 1.5 && "bg-emerald-500 hover:bg-emerald-600",
+                                    row.multiplicador === 1 && "bg-green-500/20 text-green-700 dark:text-green-300",
+                                    row.multiplicador === 0.5 && "border-amber-500 text-amber-700 dark:text-amber-300"
+                                  )}
+                                >
+                                  {row.multiplicador}x
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-medium">
+                                {formatCurrency(row.bonusEV)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex flex-col items-end">
+                                  <span className="font-bold text-success">
+                                    {formatCurrency(row.total)}
+                                  </span>
+                                  {row.total > 0 && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {formatCurrency(row.comissaoSafra)} + {formatCurrency(row.bonusEV)}
+                                    </span>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
                 )}
               </div>
             </TabsContent>

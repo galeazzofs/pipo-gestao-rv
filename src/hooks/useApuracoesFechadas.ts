@@ -1,0 +1,280 @@
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+export type TipoApuracao = 'mensal' | 'trimestral';
+
+export interface ApuracaoFechada {
+  id: string;
+  tipo: TipoApuracao;
+  mes_referencia: string;
+  data_fechamento: string;
+  total_geral: number;
+  total_cns: number;
+  total_evs: number;
+  total_lideranca: number;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface ApuracaoFechadaItem {
+  id: string;
+  apuracao_id: string;
+  colaborador_id: string;
+  
+  // CNs
+  sao_meta: number | null;
+  sao_realizado: number | null;
+  vidas_meta: number | null;
+  vidas_realizado: number | null;
+  pct_sao: number | null;
+  pct_vidas: number | null;
+  score_final: number | null;
+  multiplicador: number | null;
+  comissao_base: number | null;
+  bonus_trimestral: number | null;
+  
+  // EVs
+  comissao_safra: number | null;
+  multiplicador_meta: number | null;
+  bonus_ev: number | null;
+  
+  // Liderança
+  bonus_lideranca: number | null;
+  
+  total_pagar: number;
+  observacoes: string | null;
+  created_at: string;
+  
+  // Joined
+  colaborador?: {
+    id: string;
+    nome: string;
+    cargo: string;
+    nivel: string | null;
+    salario_base: number;
+  };
+}
+
+export interface ApuracaoItemInput {
+  colaborador_id: string;
+  
+  // CNs
+  sao_meta?: number;
+  sao_realizado?: number;
+  vidas_meta?: number;
+  vidas_realizado?: number;
+  pct_sao?: number;
+  pct_vidas?: number;
+  score_final?: number;
+  multiplicador?: number;
+  comissao_base?: number;
+  bonus_trimestral?: number;
+  
+  // EVs
+  comissao_safra?: number;
+  multiplicador_meta?: number;
+  bonus_ev?: number;
+  
+  // Liderança
+  bonus_lideranca?: number;
+  
+  total_pagar: number;
+  observacoes?: string;
+}
+
+export function useApuracoesFechadas() {
+  const [apuracoes, setApuracoes] = useState<ApuracaoFechada[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchApuracoes = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('apuracoes_fechadas')
+        .select('*')
+        .order('data_fechamento', { ascending: false });
+
+      if (error) throw error;
+      
+      setApuracoes((data || []) as ApuracaoFechada[]);
+    } catch (error: any) {
+      console.error('Erro ao buscar apurações:', error);
+      toast.error('Erro ao carregar apurações');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchApuracoes();
+  }, [fetchApuracoes]);
+
+  const saveApuracao = async (
+    tipo: TipoApuracao,
+    mesReferencia: string,
+    itens: ApuracaoItemInput[]
+  ): Promise<string | null> => {
+    try {
+      // Calcular totais
+      const totalCNs = itens
+        .filter(i => i.comissao_base !== undefined)
+        .reduce((sum, i) => sum + (i.total_pagar || 0), 0);
+      
+      const totalEVs = itens
+        .filter(i => i.comissao_safra !== undefined)
+        .reduce((sum, i) => sum + (i.total_pagar || 0), 0);
+      
+      const totalLideranca = itens
+        .filter(i => i.bonus_lideranca !== undefined && i.bonus_lideranca > 0)
+        .reduce((sum, i) => sum + (i.total_pagar || 0), 0);
+
+      const totalGeral = totalCNs + totalEVs + totalLideranca;
+
+      // Inserir cabeçalho
+      const { data: apuracaoData, error: apuracaoError } = await supabase
+        .from('apuracoes_fechadas')
+        .insert({
+          tipo,
+          mes_referencia: mesReferencia,
+          total_geral: totalGeral,
+          total_cns: totalCNs,
+          total_evs: totalEVs,
+          total_lideranca: totalLideranca,
+        })
+        .select()
+        .single();
+
+      if (apuracaoError) throw apuracaoError;
+
+      // Inserir itens
+      const itensToInsert = itens.map(item => ({
+        apuracao_id: apuracaoData.id,
+        colaborador_id: item.colaborador_id,
+        sao_meta: item.sao_meta,
+        sao_realizado: item.sao_realizado,
+        vidas_meta: item.vidas_meta,
+        vidas_realizado: item.vidas_realizado,
+        pct_sao: item.pct_sao,
+        pct_vidas: item.pct_vidas,
+        score_final: item.score_final,
+        multiplicador: item.multiplicador,
+        comissao_base: item.comissao_base,
+        bonus_trimestral: item.bonus_trimestral || 0,
+        comissao_safra: item.comissao_safra || 0,
+        multiplicador_meta: item.multiplicador_meta || 1,
+        bonus_ev: item.bonus_ev || 0,
+        bonus_lideranca: item.bonus_lideranca || 0,
+        total_pagar: item.total_pagar,
+        observacoes: item.observacoes,
+      }));
+
+      const { error: itensError } = await supabase
+        .from('apuracoes_fechadas_itens')
+        .insert(itensToInsert);
+
+      if (itensError) throw itensError;
+
+      toast.success(`Apuração ${tipo} salva com sucesso!`);
+      await fetchApuracoes();
+      return apuracaoData.id;
+    } catch (error: any) {
+      console.error('Erro ao salvar apuração:', error);
+      toast.error(error.message || 'Erro ao salvar apuração');
+      return null;
+    }
+  };
+
+  const getApuracaoItens = async (apuracaoId: string): Promise<ApuracaoFechadaItem[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('apuracoes_fechadas_itens')
+        .select(`
+          *,
+          colaborador:colaboradores(id, nome, cargo, nivel, salario_base)
+        `)
+        .eq('apuracao_id', apuracaoId);
+
+      if (error) throw error;
+      
+      return (data || []) as ApuracaoFechadaItem[];
+    } catch (error: any) {
+      console.error('Erro ao buscar itens da apuração:', error);
+      toast.error('Erro ao carregar detalhes da apuração');
+      return [];
+    }
+  };
+
+  const deleteApuracao = async (id: string): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('apuracoes_fechadas')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast.success('Apuração removida com sucesso!');
+      await fetchApuracoes();
+      return true;
+    } catch (error: any) {
+      console.error('Erro ao remover apuração:', error);
+      toast.error(error.message || 'Erro ao remover apuração');
+      return false;
+    }
+  };
+
+  // Filtros
+  const getMensais = useCallback(() => {
+    return apuracoes.filter(a => a.tipo === 'mensal');
+  }, [apuracoes]);
+
+  const getTrimestrais = useCallback(() => {
+    return apuracoes.filter(a => a.tipo === 'trimestral');
+  }, [apuracoes]);
+
+  // Para usuários verem seus próprios resultados
+  const getMeusResultados = async (email: string): Promise<ApuracaoFechadaItem[]> => {
+    try {
+      // Primeiro buscar o colaborador pelo email
+      const { data: colaboradorData, error: colaboradorError } = await supabase
+        .from('colaboradores')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (colaboradorError || !colaboradorData) {
+        return [];
+      }
+
+      // Buscar itens de apuração deste colaborador
+      const { data, error } = await supabase
+        .from('apuracoes_fechadas_itens')
+        .select(`
+          *,
+          apuracao:apuracoes_fechadas(id, tipo, mes_referencia, data_fechamento)
+        `)
+        .eq('colaborador_id', colaboradorData.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      return (data || []) as any[];
+    } catch (error: any) {
+      console.error('Erro ao buscar meus resultados:', error);
+      return [];
+    }
+  };
+
+  return {
+    apuracoes,
+    isLoading,
+    saveApuracao,
+    getApuracaoItens,
+    deleteApuracao,
+    getMensais,
+    getTrimestrais,
+    getMeusResultados,
+    refetch: fetchApuracoes,
+  };
+}

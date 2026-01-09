@@ -3,7 +3,10 @@ import { Navbar } from '@/components/Navbar';
 import { AdminRoute } from '@/components/AdminRoute';
 import { useColaboradores } from '@/hooks/useColaboradores';
 import { useApuracoesFechadas, ApuracaoItemInput } from '@/hooks/useApuracoesFechadas';
+import { useContracts } from '@/hooks/useContracts';
 import { calcularComissaoCN, CNLevel, CN_TARGETS } from '@/lib/cnCalculations';
+import { processCommissions, groupByEV, calculateTotals } from '@/components/ev/ProcessingEngine';
+import { ExcelRow, formatCurrency as formatCurrencyEV } from '@/lib/evCalculations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -40,7 +43,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ExcelDropzone } from '@/components/ev/ExcelDropzone';
-import { ExcelRow } from '@/lib/evCalculations';
 
 const TRIMESTRES = [
   { value: 'Q1', label: 'Q1 (Jan-Mar)' },
@@ -87,6 +89,7 @@ interface LiderRow {
 export default function ApuracaoTrimestral() {
   const { getCNs, getEVs, getLideres, isLoading: loadingColaboradores } = useColaboradores();
   const { saveApuracao } = useApuracoesFechadas();
+  const { contracts, isLoading: loadingContracts } = useContracts();
   
   const currentDate = new Date();
   const currentQuarter = Math.ceil((currentDate.getMonth() + 1) / 3);
@@ -167,12 +170,97 @@ export default function ApuracaoTrimestral() {
     });
   };
 
-  // Handler para Excel dos EVs
+  // Handler para Excel dos EVs - Processamento completo com matching e cálculo
   const handleExcelData = (data: ExcelRow[]) => {
     setIsProcessingExcel(true);
-    console.log('Dados do Excel:', data);
-    toast.info(`${data.length} linhas processadas do Excel`);
-    setIsProcessingExcel(false);
+    
+    try {
+      // Verifica se há contratos carregados
+      if (contracts.length === 0) {
+        toast.error('Nenhum contrato cadastrado. Cadastre contratos antes de processar.');
+        setIsProcessingExcel(false);
+        return;
+      }
+
+      console.log('=== INICIANDO PROCESSAMENTO EV ===');
+      console.log('Linhas do Excel:', data.length);
+      console.log('Contratos cadastrados:', contracts.length);
+
+      // PASSO 1-4: Processar usando o engine (matching + vigência + taxa)
+      const results = processCommissions({ excelData: data, contracts });
+      
+      // PASSO 5: Agrupar por EV e calcular totais
+      const byEV = groupByEV(results);
+      const totals = calculateTotals(results);
+      
+      console.log('=== RESULTADOS DO PROCESSAMENTO ===');
+      console.log('Agrupado por EV:', byEV);
+      console.log('Totais:', totals);
+
+      // Atualizar evRows com as comissões calculadas
+      const newEvRows: Record<string, EVRow> = { ...evRows };
+      
+      // Helper para normalizar nomes para comparação
+      const normalize = (str: string) => 
+        str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+      evs.forEach(ev => {
+        // Encontrar resultados deste EV (comparação normalizada)
+        const evResults = results.filter(r => {
+          if (!r.contract) return false;
+          const evName = normalize(r.contract.nomeEV);
+          const colaboradorName = normalize(ev.nome);
+          return evName === colaboradorName || 
+                 evName.includes(colaboradorName) || 
+                 colaboradorName.includes(evName);
+        });
+        
+        // Somar apenas comissões válidas (dentro da vigência)
+        const comissaoSafra = evResults
+          .filter(r => r.status === 'valido')
+          .reduce((sum, r) => sum + (r.comissao || 0), 0);
+        
+        const current = newEvRows[ev.id] || { 
+          comissaoSafra: 0, 
+          multiplicador: '1', 
+          bonusEV: 0, 
+          total: 0 
+        };
+        
+        const mult = parseFloat(current.multiplicador) || 0;
+        const bonusEV = (ev.salario_base || 0) * mult;
+        
+        newEvRows[ev.id] = {
+          comissaoSafra,
+          multiplicador: current.multiplicador,
+          bonusEV,
+          total: comissaoSafra + bonusEV
+        };
+
+        // Log detalhado por EV
+        if (evResults.length > 0) {
+          console.log(`EV ${ev.nome}: ${evResults.length} registros, ${evResults.filter(r => r.status === 'valido').length} válidos, Comissão: ${formatCurrencyEV(comissaoSafra)}`);
+        }
+      });
+      
+      setEvRows(newEvRows);
+      
+      // Feedback detalhado para o usuário
+      const messages = [
+        `✅ ${totals.countValidos} válidos (${formatCurrencyEV(totals.totalComissaoValida)})`,
+        totals.countExpirados > 0 ? `⚠️ ${totals.countExpirados} expirados` : null,
+        totals.countPreVigencia > 0 ? `⏳ ${totals.countPreVigencia} pré-vigência` : null,
+        totals.countNaoEncontrados > 0 ? `❌ ${totals.countNaoEncontrados} sem contrato` : null,
+      ].filter(Boolean);
+
+      toast.success(`Processamento concluído!\n${messages.join('\n')}`);
+
+    } catch (error) {
+      console.error('Erro no processamento:', error);
+      toast.error('Erro ao processar o Excel');
+    } finally {
+      setIsProcessingExcel(false);
+    }
   };
 
   // Handlers para Liderança

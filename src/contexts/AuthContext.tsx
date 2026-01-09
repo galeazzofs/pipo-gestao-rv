@@ -16,6 +16,7 @@ interface AuthContextType {
   isAdmin: boolean;
   loading: boolean;
   signInWithMagicLink: (email: string) => Promise<{ error: Error | null }>;
+  signInWithPassword: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -125,6 +126,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error };
   };
 
+  const signInWithPassword = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    return { error };
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -142,6 +151,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isAdmin,
         loading,
         signInWithMagicLink,
+        signInWithPassword,
         signOut,
       }}
     >

@@ -5,9 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { EVNavigation } from '@/components/ev/EVNavigation';
+import { GlobalNavbar } from '@/components/GlobalNavbar';
 import { ForecastCard } from '@/components/ev/ForecastCard';
-import { UserHeader } from '@/components/UserHeader';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { useForecast } from '@/hooks/useForecast';
 import { formatCurrency } from '@/lib/evCalculations';
@@ -46,8 +45,7 @@ function PrevisibilidadeContent() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <UserHeader />
-        <EVNavigation />
+        <GlobalNavbar />
         <div className="container mx-auto px-4 py-8">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
             {[1, 2, 3, 4].map((i) => (
@@ -66,8 +64,7 @@ function PrevisibilidadeContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <UserHeader />
-      <EVNavigation />
+      <GlobalNavbar />
 
       <div className="container mx-auto px-4 py-8">
         {/* Header */}

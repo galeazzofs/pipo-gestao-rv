@@ -49,12 +49,13 @@ export default function MeusResultados() {
       
       setIsLoading(true);
       const data = await getMeusResultados(profile.email);
-      setResultados(data as ResultadoItem[]);
+      // Map the data to include apuracao if available
+      setResultados(data as unknown as ResultadoItem[]);
       setIsLoading(false);
     };
 
     fetchResultados();
-  }, [profile?.email, getMeusResultados]);
+  }, [profile?.email]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {

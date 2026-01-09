@@ -36,7 +36,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ExcelDropzone } from '@/components/ev/ExcelDropzone';
-import { ExcelRow } from '@/lib/excelParser';
+import { ExcelRow } from '@/lib/evCalculations';
 
 const TRIMESTRES = [
   { value: 'Q1', label: 'Q1 (Jan-Mar)' },
@@ -367,7 +367,15 @@ export default function ApuracaoTrimestral() {
                       </TableHeader>
                       <TableBody>
                         {cns.map((cn) => {
-                          const row = cnRows[cn.id] || {};
+                          const row: CNRow = cnRows[cn.id] || {
+                            saoMeta: '',
+                            saoRealizado: '',
+                            vidasMeta: '',
+                            vidasRealizado: '',
+                            comissao: 0,
+                            bonus: '0',
+                            total: 0
+                          };
                           const nivel = (cn.nivel || 'CN1') as CNLevel;
 
                           return (
@@ -380,7 +388,7 @@ export default function ApuracaoTrimestral() {
                                 <Input
                                   type="number"
                                   min="0"
-                                  value={row.saoMeta || ''}
+                                  value={row.saoMeta}
                                   onChange={(e) => updateCNRow(cn.id, 'saoMeta', e.target.value)}
                                   className="w-16 text-center"
                                 />
@@ -389,7 +397,7 @@ export default function ApuracaoTrimestral() {
                                 <Input
                                   type="number"
                                   min="0"
-                                  value={row.saoRealizado || ''}
+                                  value={row.saoRealizado}
                                   onChange={(e) => updateCNRow(cn.id, 'saoRealizado', e.target.value)}
                                   className="w-16 text-center"
                                 />
@@ -398,7 +406,7 @@ export default function ApuracaoTrimestral() {
                                 <Input
                                   type="number"
                                   min="0"
-                                  value={row.vidasMeta || ''}
+                                  value={row.vidasMeta}
                                   onChange={(e) => updateCNRow(cn.id, 'vidasMeta', e.target.value)}
                                   className="w-16 text-center"
                                 />
@@ -407,7 +415,7 @@ export default function ApuracaoTrimestral() {
                                 <Input
                                   type="number"
                                   min="0"
-                                  value={row.vidasRealizado || ''}
+                                  value={row.vidasRealizado}
                                   onChange={(e) => updateCNRow(cn.id, 'vidasRealizado', e.target.value)}
                                   className="w-16 text-center"
                                 />
@@ -419,7 +427,7 @@ export default function ApuracaoTrimestral() {
                                 <Input
                                   type="number"
                                   min="0"
-                                  value={row.bonus || ''}
+                                  value={row.bonus}
                                   onChange={(e) => updateCNRow(cn.id, 'bonus', e.target.value)}
                                   className="w-24"
                                   placeholder="R$ 0"

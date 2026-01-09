@@ -4,12 +4,12 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { DevModeBanner } from "@/components/DevModeBanner";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import EVContratos from "./pages/EVContratos";
 import Previsibilidade from "./pages/Previsibilidade";
 import NotFound from "./pages/NotFound";
-//import { HubRoute } from "./components/HubRoute";
 
 // Hub de Apuração (Admin e Liderança)
 import GestaoTime from "./pages/hub/GestaoTime";
@@ -27,9 +27,6 @@ const HubRoute = ({ children }: { children: React.ReactNode }) => {
 
 const queryClient = new QueryClient();
 
-// Detectar modo desenvolvimento
-const IS_DEV_MODE = import.meta.env.DEV;
-
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -37,13 +34,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          {/* Banner de modo desenvolvimento */}
-          {IS_DEV_MODE && (
-            <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-500 text-amber-950 text-xs font-medium text-center py-1">
-              🛠️ Modo Desenvolvimento - Login desabilitado
-            </div>
-          )}
-          <div className={IS_DEV_MODE ? 'pt-6' : ''}>
+          <DevModeBanner />
+          <div className={import.meta.env.DEV ? 'pt-7' : ''}>
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/" element={<Landing />} />

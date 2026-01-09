@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useColaboradores } from '@/hooks/useColaboradores';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -19,7 +20,6 @@ import {
   Menu,
   ChevronDown,
   LogOut,
-  User,
   Home,
   Users,
   CalendarCheck,
@@ -41,18 +41,25 @@ const userLinks: NavLinkItem[] = [
   { label: 'Histórico', href: '/minha-comissao/historico', icon: History },
 ];
 
-// Links para área "Hub de Apuração" (apenas admins)
+// Links para área "Hub de Apuração" (admins e liderança)
 const adminLinks: NavLinkItem[] = [
   { label: 'Time', href: '/hub/time', icon: Users },
   { label: 'Mensal', href: '/hub/apuracao-mensal', icon: Receipt },
   { label: 'Trimestral', href: '/hub/apuracao-trimestral', icon: CalendarCheck },
   { label: 'Contratos', href: '/hub/contratos', icon: FileSpreadsheet },
+  { label: 'Histórico', href: '/hub/historico', icon: History },
 ];
 
 export function Navbar() {
-  const { profile, isAdmin, signOut } = useAuth();
+  const { user, profile, isAdmin, signOut } = useAuth();
+  const { colaboradores } = useColaboradores();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Check if user is Liderança
+  const colaborador = colaboradores.find(c => c.email === user?.email);
+  const isLider = colaborador?.cargo === 'Lideranca';
+  const canAccessHub = isAdmin || isLider;
 
   const isActive = (href: string) => {
     if (href === '/') return location.pathname === '/';
@@ -103,7 +110,7 @@ export function Navbar() {
               ))}
             </div>
             
-            {isAdmin && (
+            {canAccessHub && (
               <>
                 <div className="h-8 w-px bg-border mx-3" />
                 
@@ -134,7 +141,7 @@ export function Navbar() {
                       {profile?.nome?.split(' ')[0] || 'Usuário'}
                     </span>
                     <span className="text-xs text-muted-foreground leading-none mt-0.5">
-                      {isAdmin ? 'Administrador' : 'Colaborador'}
+                      {isAdmin ? 'Administrador' : isLider ? 'Liderança' : 'Colaborador'}
                     </span>
                   </div>
                   <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -176,7 +183,7 @@ export function Navbar() {
                       <p className="text-sm font-semibold truncate">{profile?.nome}</p>
                       <p className="text-xs text-muted-foreground truncate">{profile?.email}</p>
                       <span className="inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                        {isAdmin ? 'Administrador' : 'Colaborador'}
+                        {isAdmin ? 'Administrador' : isLider ? 'Liderança' : 'Colaborador'}
                       </span>
                     </div>
                   </div>
@@ -212,8 +219,8 @@ export function Navbar() {
                       </div>
                     </div>
 
-                    {/* Hub de Apuração (Admin Only) */}
-                    {isAdmin && (
+                    {/* Hub de Apuração (Admin and Liderança Only) */}
+                    {canAccessHub && (
                       <div className="mb-6">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-3">
                           Hub de Apuração

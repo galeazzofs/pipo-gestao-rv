@@ -9,17 +9,46 @@ import { Navbar } from '@/components/Navbar';
 import { ForecastCard } from '@/components/ev/ForecastCard';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { useForecast } from '@/hooks/useForecast';
+import { useAuth } from '@/contexts/AuthContext';
+import { useColaboradores } from '@/hooks/useColaboradores';
 import { formatCurrency } from '@/lib/evCalculations';
 
 function PrevisibilidadeContent() {
-  const { forecastData, metrics, isLoading, uniqueEVs } = useForecast();
+  const { forecastData, isLoading: forecastLoading, uniqueEVs } = useForecast();
+  const { user, isAdmin } = useAuth();
+  const { colaboradores, isLoading: colaboradoresLoading } = useColaboradores();
+  
   const [selectedEV, setSelectedEV] = useState<string>('all');
   const [showFinalizados, setShowFinalizados] = useState(false);
 
+  const isLoading = forecastLoading || colaboradoresLoading;
+
+  // Check user permissions
+  const colaborador = colaboradores.find(c => c.email === user?.email);
+  const isLider = colaborador?.cargo === 'Lideranca';
+  const canViewAll = isAdmin || isLider;
+
+  // Filter data based on permissions
+  const visibleData = useMemo(() => {
+    if (canViewAll) return forecastData;
+    // For CNs/EVs, filter only their own contracts
+    if (colaborador) {
+      return forecastData.filter(f => f.nomeEV === colaborador.nome);
+    }
+    return [];
+  }, [forecastData, canViewAll, colaborador]);
+
+  // Then apply EV filter on visible data
   const filteredData = useMemo(() => {
-    if (selectedEV === 'all') return forecastData;
-    return forecastData.filter((f) => f.nomeEV === selectedEV);
-  }, [forecastData, selectedEV]);
+    if (selectedEV === 'all') return visibleData;
+    return visibleData.filter((f) => f.nomeEV === selectedEV);
+  }, [visibleData, selectedEV]);
+
+  // Get unique EVs from visible data only
+  const visibleEVs = useMemo(() => {
+    const evs = new Set(visibleData.map(f => f.nomeEV));
+    return Array.from(evs).sort();
+  }, [visibleData]);
 
   const { ativos, churnRisk, finalizados } = useMemo(() => {
     return {
@@ -30,7 +59,7 @@ function PrevisibilidadeContent() {
   }, [filteredData]);
 
   const filteredMetrics = useMemo(() => {
-    const data = selectedEV === 'all' ? forecastData : filteredData;
+    const data = selectedEV === 'all' ? visibleData : filteredData;
     const ativosData = data.filter((f) => f.status === 'ativo');
     
     return {
@@ -40,7 +69,7 @@ function PrevisibilidadeContent() {
       totalChurnRisk: data.filter((f) => f.status === 'churn_risk').length,
       totalFinalizados: data.filter((f) => f.status === 'finalizado').length,
     };
-  }, [forecastData, filteredData, selectedEV]);
+  }, [visibleData, filteredData, selectedEV]);
 
   if (isLoading) {
     return (
@@ -72,26 +101,31 @@ function PrevisibilidadeContent() {
           <div>
             <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
               <TrendingUp className="h-8 w-8 text-primary" />
-              Minha Previsibilidade
+              {canViewAll ? 'Previsibilidade' : 'Minha Previsibilidade'}
             </h1>
             <p className="text-muted-foreground mt-1">
-              Veja quanto ainda tem a receber dos seus contratos ativos
+              {canViewAll 
+                ? 'Visualize a projeção de comissões de todos os contratos' 
+                : 'Veja quanto ainda tem a receber dos seus contratos ativos'}
             </p>
           </div>
 
-          <Select value={selectedEV} onValueChange={setSelectedEV}>
-            <SelectTrigger className="w-[220px]">
-              <SelectValue placeholder="Filtrar por EV" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os EVs</SelectItem>
-              {uniqueEVs.map((ev) => (
-                <SelectItem key={ev} value={ev}>
-                  {ev}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Only show EV filter if user can view all and there are multiple EVs */}
+          {canViewAll && visibleEVs.length > 1 && (
+            <Select value={selectedEV} onValueChange={setSelectedEV}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Filtrar por EV" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os EVs</SelectItem>
+                {visibleEVs.map((ev) => (
+                  <SelectItem key={ev} value={ev}>
+                    {ev}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         {/* KPI Cards */}
@@ -125,7 +159,7 @@ function PrevisibilidadeContent() {
                 {formatCurrency(filteredMetrics.mediaMensal)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Seu "salário" atual de comissão
+                {canViewAll ? 'Total mensal recorrente' : 'Seu "salário" atual de comissão'}
               </p>
             </CardContent>
           </Card>
@@ -165,6 +199,15 @@ function PrevisibilidadeContent() {
           </Card>
         </div>
 
+        {/* No data message for non-admin users */}
+        {!canViewAll && visibleData.length === 0 && (
+          <Card className="p-8 text-center">
+            <p className="text-muted-foreground">
+              Você ainda não possui contratos cadastrados em seu nome.
+            </p>
+          </Card>
+        )}
+
         {/* Churn Risk Section */}
         {churnRisk.length > 0 && (
           <div className="mb-8">
@@ -181,25 +224,19 @@ function PrevisibilidadeContent() {
         )}
 
         {/* Active Contracts Section */}
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-foreground flex items-center gap-2 mb-4">
-            <CheckCircle2 className="h-5 w-5 text-green-500" />
-            Contratos Ativos ({ativos.length})
-          </h2>
-          {ativos.length === 0 ? (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">
-                Nenhum contrato ativo encontrado
-              </p>
-            </Card>
-          ) : (
+        {ativos.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-foreground flex items-center gap-2 mb-4">
+              <CheckCircle2 className="h-5 w-5 text-green-500" />
+              Contratos Ativos ({ativos.length})
+            </h2>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {ativos.map((forecast) => (
                 <ForecastCard key={forecast.contractId} forecast={forecast} />
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Finalized Contracts Section (Collapsible) */}
         {finalizados.length > 0 && (

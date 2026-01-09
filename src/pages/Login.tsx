@@ -72,7 +72,7 @@ const Login = () => {
 
               {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
-              <button type="submit" disabled={isSubmitting || !email} className="btn-primary w-full flex items-center justify-center gap-2">
+              <button type="submit" disabled={isSubmitting || !email} className="btn-primary w-full gap-2 items-center justify-center flex flex-row text-center border-0 rounded-sm opacity-100 shadow-none">
                 {isSubmitting ? 'Enviando...' : <>
                     Enviar link de acesso
                     <ArrowRight className="w-4 h-4" />

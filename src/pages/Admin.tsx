@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { GlobalNavbar } from '@/components/GlobalNavbar';
-import { Plus, Users, Trash2, Edit2, X, Check } from 'lucide-react';
+import { Plus, LogOut, Users, Trash2, Edit2, X, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Profile {
@@ -13,6 +13,7 @@ interface Profile {
 }
 
 const Admin = () => {
+  const { signOut, session } = useAuth();
   const { toast } = useToast();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,18 +139,25 @@ const Admin = () => {
   const niveis: ('CN1' | 'CN2' | 'CN3')[] = ['CN1', 'CN2', 'CN3'];
 
   return (
-    <div className="min-h-screen bg-background">
-      <GlobalNavbar />
-
-      <div className="mx-auto max-w-4xl px-4 py-8">
+    <div className="min-h-screen bg-background px-4 py-8">
+      <div className="mx-auto max-w-4xl">
         {/* Header */}
-        <header className="mb-8">
-          <h1 className="text-2xl font-bold text-foreground">
-            Painel Administrativo
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Gerencie os Consultores de Negócios
-          </p>
+        <header className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">
+              Painel Administrativo
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Gerencie os Consultores de Negócios
+            </p>
+          </div>
+          <button
+            onClick={signOut}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            Sair
+          </button>
         </header>
 
         {/* Stats */}
@@ -324,7 +332,7 @@ const Admin = () => {
                         </button>
                         <button
                           onClick={() => handleDeleteProfile(profile.id)}
-                          className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
+                          className="p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-lg"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

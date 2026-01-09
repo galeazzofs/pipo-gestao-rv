@@ -5,6 +5,3 @@ verify_jwt = false
 
 [functions.setup-admin]
 verify_jwt = false
-
-[functions.check-admin-email]
-verify_jwt = false

@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { GlobalNavbar } from '@/components/GlobalNavbar';
-import { AdminRoute } from '@/components/AdminRoute';
+import { EVNavigation } from '@/components/ev/EVNavigation';
+import { UserHeader } from '@/components/UserHeader';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { ContractForm } from '@/components/ev/ContractForm';
 import { ContractExcelUpload } from '@/components/ev/ContractExcelUpload';
 import { ContractTable } from '@/components/ev/ContractTable';
@@ -69,7 +70,8 @@ function EVContratosContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <GlobalNavbar />
+      <UserHeader />
+      <EVNavigation />
 
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
@@ -203,8 +205,8 @@ function EVContratosContent() {
 
 export default function EVContratos() {
   return (
-    <AdminRoute>
+    <ProtectedRoute>
       <EVContratosContent />
-    </AdminRoute>
+    </ProtectedRoute>
   );
 }

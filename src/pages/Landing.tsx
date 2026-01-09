@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { GlobalNavbar } from '@/components/GlobalNavbar';
+import { Button } from '@/components/ui/button';
 import { 
   Calculator, 
   FileSpreadsheet, 
@@ -15,10 +15,10 @@ import {
 } from 'lucide-react';
 
 const Landing = () => {
-  const { isAdmin } = useAuth();
+  const { signOut, profile } = useAuth();
   const navigate = useNavigate();
 
-  const allFeatures = [
+  const features = [
     {
       title: 'Calculadora CN',
       description: 'Calcule comissões mensais baseadas em SAOs e Vidas para consultores de nível CN1, CN2 e CN3.',
@@ -26,16 +26,6 @@ const Landing = () => {
       href: '/calculadora-cn',
       color: 'bg-blue-500/10 text-blue-600',
       borderColor: 'hover:border-blue-500/30',
-      adminOnly: false,
-    },
-    {
-      title: 'Minha Previsibilidade',
-      description: 'Veja quanto ainda tem a receber dos seus contratos ativos e identifique riscos de churn.',
-      icon: TrendingUp,
-      href: '/previsibilidade',
-      color: 'bg-cyan-500/10 text-cyan-600',
-      borderColor: 'hover:border-cyan-500/30',
-      adminOnly: false,
     },
     {
       title: 'Base de Contratos',
@@ -44,7 +34,14 @@ const Landing = () => {
       href: '/ev/contratos',
       color: 'bg-emerald-500/10 text-emerald-600',
       borderColor: 'hover:border-emerald-500/30',
-      adminOnly: true,
+    },
+    {
+      title: 'Minha Previsibilidade',
+      description: 'Veja quanto ainda tem a receber dos seus contratos ativos e identifique riscos de churn.',
+      icon: TrendingUp,
+      href: '/previsibilidade',
+      color: 'bg-cyan-500/10 text-cyan-600',
+      borderColor: 'hover:border-cyan-500/30',
     },
     {
       title: 'Histórico',
@@ -53,7 +50,6 @@ const Landing = () => {
       href: '/historico',
       color: 'bg-amber-500/10 text-amber-600',
       borderColor: 'hover:border-amber-500/30',
-      adminOnly: true,
     },
     {
       title: 'Administração',
@@ -66,9 +62,6 @@ const Landing = () => {
     },
   ];
 
-  // Filter features based on admin status
-  const features = allFeatures.filter((f) => !f.adminOnly || isAdmin);
-
   const stats = [
     { icon: Zap, label: 'Processamento Rápido', value: 'Instantâneo' },
     { icon: BarChart3, label: 'Precisão', value: '100%' },
@@ -78,7 +71,31 @@ const Landing = () => {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-background">
-        <GlobalNavbar />
+        {/* Header */}
+        <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Calculator className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-bold text-foreground">ComissõesPro</h1>
+                  <p className="text-xs text-muted-foreground">Sistema de Comissões</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-muted-foreground hidden md:block">
+                  Olá, <span className="font-medium text-foreground">{profile?.nome || 'Usuário'}</span>
+                </span>
+                <Button variant="outline" size="sm" onClick={signOut}>
+                  Sair
+                </Button>
+              </div>
+            </div>
+          </div>
+        </header>
 
         {/* Hero Section */}
         <section className="py-16 md:py-24">

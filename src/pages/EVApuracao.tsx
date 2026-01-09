@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { GlobalNavbar } from '@/components/GlobalNavbar';
-import { AdminRoute } from '@/components/AdminRoute';
+import { EVNavigation } from '@/components/ev/EVNavigation';
+import { UserHeader } from '@/components/UserHeader';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { ExcelDropzone } from '@/components/ev/ExcelDropzone';
 import { ResultsDashboard } from '@/components/ev/ResultsDashboard';
 import { useContracts } from '@/hooks/useContracts';
@@ -101,7 +102,8 @@ function EVApuracaoContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <GlobalNavbar />
+      <UserHeader />
+      <EVNavigation />
 
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
@@ -200,8 +202,8 @@ function EVApuracaoContent() {
 
 export default function EVApuracao() {
   return (
-    <AdminRoute>
+    <ProtectedRoute>
       <EVApuracaoContent />
-    </AdminRoute>
+    </ProtectedRoute>
   );
 }

@@ -6,7 +6,9 @@ import { useApuracoesFechadas, ApuracaoItemInput } from '@/hooks/useApuracoesFec
 import { useContracts } from '@/hooks/useContracts';
 import { calcularComissaoCN, CNLevel, CN_TARGETS } from '@/lib/cnCalculations';
 import { processCommissions, groupByEV, calculateTotals } from '@/components/ev/ProcessingEngine';
-import { ExcelRow, formatCurrency as formatCurrencyEV } from '@/lib/evCalculations';
+import { ExcelRow, formatCurrency as formatCurrencyEV, ProcessedResult } from '@/lib/evCalculations';
+import { ResultsDashboard } from '@/components/ev/ResultsDashboard';
+import { ResultsTable } from '@/components/ev/ResultsTable';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -107,6 +109,12 @@ export default function ApuracaoTrimestral() {
   const [evRows, setEvRows] = useState<Record<string, EVRow>>({});
   const [liderRows, setLiderRows] = useState<Record<string, LiderRow>>({});
   const [isProcessingExcel, setIsProcessingExcel] = useState(false);
+  
+  // Estados para visualização detalhada dos EVs (como na implementação original)
+  const [evResults, setEvResults] = useState<ProcessedResult[]>([]);
+  const [hasProcessedExcel, setHasProcessedExcel] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState('__all__');
+  const [selectedEV, setSelectedEV] = useState('__all__');
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -189,6 +197,10 @@ export default function ApuracaoTrimestral() {
       // PASSO 1-4: Processar usando o engine (matching + vigência + taxa)
       const results = processCommissions({ excelData: data, contracts });
       
+      // NOVO: Armazenar resultados para exibição detalhada
+      setEvResults(results);
+      setHasProcessedExcel(true);
+      
       // PASSO 5: Agrupar por EV e calcular totais
       const byEV = groupByEV(results);
       const totals = calculateTotals(results);
@@ -206,7 +218,7 @@ export default function ApuracaoTrimestral() {
 
       evs.forEach(ev => {
         // Encontrar resultados deste EV (comparação normalizada)
-        const evResults = results.filter(r => {
+        const evResultsFiltered = results.filter(r => {
           if (!r.contract) return false;
           const evName = normalize(r.contract.nomeEV);
           const colaboradorName = normalize(ev.nome);
@@ -216,7 +228,7 @@ export default function ApuracaoTrimestral() {
         });
         
         // Somar apenas comissões válidas (dentro da vigência)
-        const comissaoSafra = evResults
+        const comissaoSafra = evResultsFiltered
           .filter(r => r.status === 'valido')
           .reduce((sum, r) => sum + (r.comissao || 0), 0);
         
@@ -238,8 +250,8 @@ export default function ApuracaoTrimestral() {
         };
 
         // Log detalhado por EV
-        if (evResults.length > 0) {
-          console.log(`EV ${ev.nome}: ${evResults.length} registros, ${evResults.filter(r => r.status === 'valido').length} válidos, Comissão: ${formatCurrencyEV(comissaoSafra)}`);
+        if (evResultsFiltered.length > 0) {
+          console.log(`EV ${ev.nome}: ${evResultsFiltered.length} registros, ${evResultsFiltered.filter(r => r.status === 'valido').length} válidos, Comissão: ${formatCurrencyEV(comissaoSafra)}`);
         }
       });
       
@@ -581,7 +593,7 @@ export default function ApuracaoTrimestral() {
                 <div className="text-sm">
                   <p className="font-medium text-emerald-800 dark:text-emerald-300">Comissão Safra + Bônus EV</p>
                   <p className="text-emerald-700 dark:text-emerald-400">
-                    Faça upload do Excel de comissões ou preencha manualmente. Bônus = Salário Base × Multiplicador.
+                    Faça upload do Excel de comissões. Bônus = Salário Base × Multiplicador.
                   </p>
                 </div>
               </div>
@@ -594,7 +606,30 @@ export default function ApuracaoTrimestral() {
                 />
               </div>
 
+              {/* Dashboard com cards e filtros (visualização original) */}
+              {hasProcessedExcel && evResults.length > 0 && (
+                <div className="space-y-6 mb-6">
+                  <ResultsDashboard 
+                    results={evResults}
+                    selectedMonth={selectedMonth}
+                    selectedEV={selectedEV}
+                    onMonthChange={setSelectedMonth}
+                    onEVChange={setSelectedEV}
+                  />
+                  
+                  <ResultsTable 
+                    results={evResults}
+                    selectedMonth={selectedMonth}
+                    selectedEV={selectedEV}
+                  />
+                </div>
+              )}
+
+              {/* Tabela de Totais por EV + Bônus */}
               <div className="card-premium overflow-hidden">
+                <div className="p-4 border-b bg-muted/30">
+                  <h3 className="font-semibold">Resumo por EV + Bônus</h3>
+                </div>
                 {evs.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
                     Nenhum EV cadastrado.
@@ -621,15 +656,8 @@ export default function ApuracaoTrimestral() {
                             <TableCell className="text-right text-muted-foreground">
                               {formatCurrency(ev.salario_base)}
                             </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                min="0"
-                                value={row.comissaoSafra || ''}
-                                onChange={(e) => updateEVRow(ev.id, 'comissaoSafra', parseFloat(e.target.value) || 0)}
-                                className="w-28"
-                                placeholder="R$ 0"
-                              />
+                            <TableCell className="text-right font-medium text-success">
+                              {formatCurrency(row.comissaoSafra)}
                             </TableCell>
                             <TableCell>
                               <Select

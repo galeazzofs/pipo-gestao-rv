@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { AdminRoute } from '@/components/AdminRoute';
 import { useColaboradores } from '@/hooks/useColaboradores';
@@ -73,6 +73,24 @@ const getMultiplicadorLabel = (mult: number): string => {
   return '1.5x Salário';
 };
 
+// Retorna os meses do quarter selecionado (0-indexed: Jan=0, Dez=11)
+const getQuarterMonths = (quarter: string): number[] => {
+  switch (quarter) {
+    case 'Q1': return [0, 1, 2]; // Jan, Fev, Mar
+    case 'Q2': return [3, 4, 5]; // Abr, Mai, Jun
+    case 'Q3': return [6, 7, 8]; // Jul, Ago, Set
+    case 'Q4': return [9, 10, 11]; // Out, Nov, Dez
+    default: return [];
+  }
+};
+
+// Verifica se uma data está dentro do quarter/ano selecionado
+const isDateInQuarter = (date: Date, quarter: string, year: string): boolean => {
+  const monthsInQuarter = getQuarterMonths(quarter);
+  return date.getFullYear() === parseInt(year) && 
+         monthsInQuarter.includes(date.getMonth());
+};
+
 interface CNRow {
   saoMeta: string;
   saoRealizado: string;
@@ -128,6 +146,7 @@ export default function ApuracaoTrimestral() {
   const [evResults, setEvResults] = useState<ProcessedResult[]>([]);
   const [hasProcessedExcel, setHasProcessedExcel] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState('__all__');
+  const [excelDataOriginal, setExcelDataOriginal] = useState<ExcelRow[]>([]);
   const [selectedEV, setSelectedEV] = useState('__all__');
 
   const formatCurrency = (value: number) => {
@@ -202,100 +221,125 @@ export default function ApuracaoTrimestral() {
     });
   };
 
-  // Handler para Excel dos EVs - Processamento completo com matching e cálculo
-  const handleExcelData = (data: ExcelRow[]) => {
+  // Processa dados do Excel filtrando pelo quarter selecionado
+  const processExcelForQuarter = useCallback((data: ExcelRow[], quarterFilter: string, yearFilter: string) => {
+    if (contracts.length === 0) {
+      toast.error('Nenhum contrato cadastrado. Cadastre contratos antes de processar.');
+      return;
+    }
+
+    // Filtrar linhas por quarter selecionado
+    const quarterMonths = getQuarterMonths(quarterFilter);
+    const yearNum = parseInt(yearFilter);
+    
+    const filteredData = data.filter(row => {
+      const month = row.dataRecebimento.getMonth();
+      const year = row.dataRecebimento.getFullYear();
+      return year === yearNum && quarterMonths.includes(month);
+    });
+
+    console.log(`=== PROCESSAMENTO EV: ${quarterFilter}/${yearFilter} ===`);
+    console.log(`Filtrado: ${filteredData.length} de ${data.length} parcelas`);
+
+    if (filteredData.length === 0) {
+      toast.warning(
+        `Nenhuma parcela encontrada para ${quarterFilter}/${yearFilter}.\n` +
+        `Total no arquivo: ${data.length} linhas.`
+      );
+      setEvResults([]);
+      // Resetar comissões dos EVs quando não há dados
+      const resetEvRows: Record<string, EVRow> = {};
+      evs.forEach(ev => {
+        const current = evRows[ev.id];
+        resetEvRows[ev.id] = {
+          comissaoSafra: 0,
+          metaMRR: current?.metaMRR || '',
+          mrrRealizado: current?.mrrRealizado || '',
+          pctAtingimento: current?.pctAtingimento || 0,
+          multiplicador: current?.multiplicador || 0,
+          bonusEV: current?.bonusEV || 0,
+          total: current?.bonusEV || 0
+        };
+      });
+      setEvRows(resetEvRows);
+      return;
+    }
+
+    // Processar usando o engine (matching + vigência + taxa)
+    const results = processCommissions({ excelData: filteredData, contracts });
+    
+    setEvResults(results);
+    setHasProcessedExcel(true);
+    
+    const totals = calculateTotals(results);
+    
+    // Helper para normalizar nomes para comparação
+    const normalize = (str: string) => 
+      str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+    // Atualizar evRows com as comissões calculadas
+    const newEvRows: Record<string, EVRow> = { ...evRows };
+
+    evs.forEach(ev => {
+      const evResultsFiltered = results.filter(r => {
+        if (!r.contract) return false;
+        const evName = normalize(r.contract.nomeEV);
+        const colaboradorName = normalize(ev.nome);
+        return evName === colaboradorName || 
+               evName.includes(colaboradorName) || 
+               colaboradorName.includes(evName);
+      });
+      
+      const comissaoSafra = evResultsFiltered
+        .filter(r => r.status === 'valido')
+        .reduce((sum, r) => sum + (r.comissao || 0), 0);
+      
+      const current = newEvRows[ev.id] || { 
+        comissaoSafra: 0, metaMRR: '', mrrRealizado: '',
+        pctAtingimento: 0, multiplicador: 0, bonusEV: 0, total: 0 
+      };
+      
+      const mult = current.multiplicador;
+      const bonusEV = (ev.salario_base || 0) * mult;
+      
+      newEvRows[ev.id] = {
+        comissaoSafra,
+        metaMRR: current.metaMRR,
+        mrrRealizado: current.mrrRealizado,
+        pctAtingimento: current.pctAtingimento,
+        multiplicador: mult,
+        bonusEV,
+        total: comissaoSafra + bonusEV
+      };
+
+      if (evResultsFiltered.length > 0) {
+        console.log(`EV ${ev.nome}: ${evResultsFiltered.filter(r => r.status === 'valido').length} válidos, Comissão: ${formatCurrencyEV(comissaoSafra)}`);
+      }
+    });
+    
+    setEvRows(newEvRows);
+    
+    // Feedback para o usuário
+    const messages = [
+      `📅 ${quarterFilter}/${yearFilter}: ${filteredData.length} parcelas`,
+      `✅ ${totals.countValidos} válidos (${formatCurrencyEV(totals.totalComissaoValida)})`,
+      totals.countExpirados > 0 ? `⚠️ ${totals.countExpirados} expirados` : null,
+      totals.countNaoEncontrados > 0 ? `❌ ${totals.countNaoEncontrados} sem contrato` : null,
+    ].filter(Boolean);
+
+    toast.success(messages.join('\n'));
+  }, [contracts, evs, evRows]);
+
+  // Handler para Excel dos EVs - Salva dados originais e processa
+  const handleExcelData = useCallback((data: ExcelRow[]) => {
     setIsProcessingExcel(true);
     
     try {
-      // Verifica se há contratos carregados
-      if (contracts.length === 0) {
-        toast.error('Nenhum contrato cadastrado. Cadastre contratos antes de processar.');
-        setIsProcessingExcel(false);
-        return;
-      }
-
-      console.log('=== INICIANDO PROCESSAMENTO EV ===');
-      console.log('Linhas do Excel:', data.length);
-      console.log('Contratos cadastrados:', contracts.length);
-
-      // PASSO 1-4: Processar usando o engine (matching + vigência + taxa)
-      const results = processCommissions({ excelData: data, contracts });
+      // Salvar dados originais para reprocessamento
+      setExcelDataOriginal(data);
       
-      // NOVO: Armazenar resultados para exibição detalhada
-      setEvResults(results);
-      setHasProcessedExcel(true);
-      
-      // PASSO 5: Agrupar por EV e calcular totais
-      const byEV = groupByEV(results);
-      const totals = calculateTotals(results);
-      
-      console.log('=== RESULTADOS DO PROCESSAMENTO ===');
-      console.log('Agrupado por EV:', byEV);
-      console.log('Totais:', totals);
-
-      // Atualizar evRows com as comissões calculadas
-      const newEvRows: Record<string, EVRow> = { ...evRows };
-      
-      // Helper para normalizar nomes para comparação
-      const normalize = (str: string) => 
-        str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-
-      evs.forEach(ev => {
-        // Encontrar resultados deste EV (comparação normalizada)
-        const evResultsFiltered = results.filter(r => {
-          if (!r.contract) return false;
-          const evName = normalize(r.contract.nomeEV);
-          const colaboradorName = normalize(ev.nome);
-          return evName === colaboradorName || 
-                 evName.includes(colaboradorName) || 
-                 colaboradorName.includes(evName);
-        });
-        
-        // Somar apenas comissões válidas (dentro da vigência)
-        const comissaoSafra = evResultsFiltered
-          .filter(r => r.status === 'valido')
-          .reduce((sum, r) => sum + (r.comissao || 0), 0);
-        
-        const current = newEvRows[ev.id] || { 
-          comissaoSafra: 0, 
-          metaMRR: '',
-          mrrRealizado: '',
-          pctAtingimento: 0,
-          multiplicador: 0, 
-          bonusEV: 0, 
-          total: 0 
-        };
-        
-        const mult = current.multiplicador;
-        const bonusEV = (ev.salario_base || 0) * mult;
-        
-        newEvRows[ev.id] = {
-          comissaoSafra,
-          metaMRR: current.metaMRR,
-          mrrRealizado: current.mrrRealizado,
-          pctAtingimento: current.pctAtingimento,
-          multiplicador: mult,
-          bonusEV,
-          total: comissaoSafra + bonusEV
-        };
-
-        // Log detalhado por EV
-        if (evResultsFiltered.length > 0) {
-          console.log(`EV ${ev.nome}: ${evResultsFiltered.length} registros, ${evResultsFiltered.filter(r => r.status === 'valido').length} válidos, Comissão: ${formatCurrencyEV(comissaoSafra)}`);
-        }
-      });
-      
-      setEvRows(newEvRows);
-      
-      // Feedback detalhado para o usuário
-      const messages = [
-        `✅ ${totals.countValidos} válidos (${formatCurrencyEV(totals.totalComissaoValida)})`,
-        totals.countExpirados > 0 ? `⚠️ ${totals.countExpirados} expirados` : null,
-        totals.countPreVigencia > 0 ? `⏳ ${totals.countPreVigencia} pré-vigência` : null,
-        totals.countNaoEncontrados > 0 ? `❌ ${totals.countNaoEncontrados} sem contrato` : null,
-      ].filter(Boolean);
-
-      toast.success(`Processamento concluído!\n${messages.join('\n')}`);
+      // Processar com o quarter selecionado
+      processExcelForQuarter(data, trimestre, ano);
 
     } catch (error) {
       console.error('Erro no processamento:', error);
@@ -303,7 +347,15 @@ export default function ApuracaoTrimestral() {
     } finally {
       setIsProcessingExcel(false);
     }
-  };
+  }, [processExcelForQuarter, trimestre, ano]);
+
+  // Reprocessar automaticamente quando quarter/ano mudar (se já tem dados carregados)
+  useEffect(() => {
+    if (excelDataOriginal.length > 0) {
+      console.log(`Reprocessando para ${trimestre}/${ano}...`);
+      processExcelForQuarter(excelDataOriginal, trimestre, ano);
+    }
+  }, [trimestre, ano]);
 
   // Handlers para Liderança
   const updateLiderRow = (id: string, bonus: string) => {

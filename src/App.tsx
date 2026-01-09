@@ -9,7 +9,7 @@ import Login from "./pages/Login";
 import EVContratos from "./pages/EVContratos";
 import Previsibilidade from "./pages/Previsibilidade";
 import NotFound from "./pages/NotFound";
-import { HubRoute } from "./components/HubRoute";
+//import { HubRoute } from "./components/HubRoute";
 
 // Hub de Apuração (Admin e Liderança)
 import GestaoTime from "./pages/hub/GestaoTime";
@@ -20,6 +20,10 @@ import HistoricoApuracoes from "./pages/hub/HistoricoApuracoes";
 // Minha Comissão (Usuários)
 import Simulador from "./pages/minha-comissao/Simulador";
 import MeusResultados from "./pages/minha-comissao/MeusResultados";
+
+const HubRoute = ({ children }: { children: React.ReactNode }) => {
+  return <>{children}</>;
+};
 
 const queryClient = new QueryClient();
 
@@ -33,19 +37,40 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<Landing />} />
-            
+
             {/* Minha Comissão (todos usuários) */}
             <Route path="/minha-comissao/simulador" element={<Simulador />} />
             <Route path="/minha-comissao/previsao" element={<Previsibilidade />} />
             <Route path="/minha-comissao/historico" element={<MeusResultados />} />
-            
+
             {/* Hub de Apuração (admins e liderança) */}
-            <Route path="/hub/time" element={<HubRoute><GestaoTime /></HubRoute>} />
-            <Route path="/hub/apuracao-mensal" element={<HubRoute><ApuracaoMensal /></HubRoute>} />
-            <Route path="/hub/apuracao-trimestral" element={<HubRoute><ApuracaoTrimestral /></HubRoute>} />
+            <Route
+              path="/hub/time"
+              element={
+                <HubRoute>
+                  <GestaoTime />
+                </HubRoute>
+              }
+            />
+            <Route
+              path="/hub/apuracao-mensal"
+              element={
+                <HubRoute>
+                  <ApuracaoMensal />
+                </HubRoute>
+              }
+            />
+            <Route
+              path="/hub/apuracao-trimestral"
+              element={
+                <HubRoute>
+                  <ApuracaoTrimestral />
+                </HubRoute>
+              }
+            />
             <Route path="/hub/contratos" element={<EVContratos />} />
             <Route path="/hub/historico" element={<HistoricoApuracoes />} />
-            
+
             {/* Legacy routes - redirect to new paths */}
             <Route path="/calculadora-cn" element={<Navigate to="/minha-comissao/simulador" replace />} />
             <Route path="/previsibilidade" element={<Navigate to="/minha-comissao/previsao" replace />} />
@@ -54,7 +79,7 @@ const App = () => (
             <Route path="/ev-calculator" element={<Navigate to="/hub/contratos" replace />} />
             <Route path="/historico" element={<Navigate to="/hub/historico" replace />} />
             <Route path="/admin" element={<Navigate to="/hub/time" replace />} />
-            
+
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

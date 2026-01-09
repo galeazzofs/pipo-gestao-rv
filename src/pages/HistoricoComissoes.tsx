@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { Navbar } from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,16 +32,12 @@ import {
 } from '@/components/ui/collapsible';
 import { useApuracoes, ApuracaoItem } from '@/hooks/useApuracoes';
 import { useContracts } from '@/hooks/useContracts';
-import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, ChevronDown, ChevronRight, Trash2, History } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronRight, Trash2, History } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatCurrency, formatPercent } from '@/lib/evCalculations';
 
 const HistoricoComissoes = () => {
-  const { signOut } = useAuth();
-  const navigate = useNavigate();
   const { apuracoes, isLoading, getApuracaoItems, deleteApuracao } = useApuracoes();
   const { getUniqueEVNames, getUniqueClientes } = useContracts();
   
@@ -130,25 +127,11 @@ const HistoricoComissoes = () => {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-background">
+        <Navbar />
+        
         <div className="max-w-7xl mx-auto px-4 py-8">
           {/* Header */}
           <header className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <button
-                onClick={() => navigate('/ev-calculator')}
-                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Voltar para Calculadora
-              </button>
-              <button
-                onClick={signOut}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Sair
-              </button>
-            </div>
-            
             <div className="flex items-center gap-3 mb-2">
               <History className="w-8 h-8 text-primary" />
               <h1 className="text-2xl md:text-3xl font-bold text-foreground">

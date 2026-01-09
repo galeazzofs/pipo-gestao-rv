@@ -28,12 +28,12 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<Landing />} />
             <Route path="/calculadora-cn" element={<Index />} />
-            <Route path="/ev/contratos" element={<EVContratos />} />
-            <Route path="/ev/apuracao" element={<EVApuracao />} />
+            <Route path="/ev/contratos" element={<AdminRoute><EVContratos /></AdminRoute>} />
+            <Route path="/ev/apuracao" element={<AdminRoute><EVApuracao /></AdminRoute>} />
             <Route path="/previsibilidade" element={<Previsibilidade />} />
             {/* Redirect old route */}
             <Route path="/ev-calculator" element={<Navigate to="/ev/contratos" replace />} />
-            <Route path="/historico" element={<HistoricoComissoes />} />
+            <Route path="/historico" element={<AdminRoute><HistoricoComissoes /></AdminRoute>} />
             <Route 
               path="/admin" 
               element={

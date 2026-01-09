@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { UserHeader } from './UserHeader';
+import { Navbar } from '@/components/Navbar';
 import { MetricInputGroup } from './MetricInputGroup';
 import { ResultDisplay } from './ResultDisplay';
 
@@ -80,45 +80,59 @@ export const CNCalculator = () => {
     vidasRealizado !== '';
 
   return (
-    <div className="min-h-screen bg-background px-4 py-8 md:py-12">
-      <div className="mx-auto max-w-lg">
-        {/* User Header with name and level */}
-        <UserHeader />
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      
+      <div className="px-4 py-8 md:py-12">
+        <div className="mx-auto max-w-lg">
+          {/* Header */}
+          <header className="mb-8 text-center">
+            <h1 className="text-2xl font-bold text-foreground md:text-3xl">
+              Calculadora CN
+            </h1>
+            <p className="mt-2 text-muted-foreground">
+              Calcule sua comissão mensal baseada em SAOs e Vidas
+            </p>
+            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
+              Nível: {level}
+            </div>
+          </header>
 
-        {/* Main Card */}
-        <div className="card-premium p-6 md:p-8">
-          {/* SAOs Input Group */}
-          <MetricInputGroup
-            title="SAOs"
-            metaValue={saoMeta}
-            realizadoValue={saoRealizado}
-            onMetaChange={setSaoMeta}
-            onRealizadoChange={setSaoRealizado}
-          />
+          {/* Main Card */}
+          <div className="card-premium p-6 md:p-8">
+            {/* SAOs Input Group */}
+            <MetricInputGroup
+              title="SAOs"
+              metaValue={saoMeta}
+              realizadoValue={saoRealizado}
+              onMetaChange={setSaoMeta}
+              onRealizadoChange={setSaoRealizado}
+            />
 
-          {/* Vidas SAOs Input Group */}
-          <MetricInputGroup
-            title="Vidas SAOs"
-            metaValue={vidasMeta}
-            realizadoValue={vidasRealizado}
-            onMetaChange={setVidasMeta}
-            onRealizadoChange={setVidasRealizado}
-          />
+            {/* Vidas SAOs Input Group */}
+            <MetricInputGroup
+              title="Vidas SAOs"
+              metaValue={vidasMeta}
+              realizadoValue={vidasRealizado}
+              onMetaChange={setVidasMeta}
+              onRealizadoChange={setVidasRealizado}
+            />
 
-          {/* Calculate Button */}
-          <button
-            onClick={handleCalculate}
-            disabled={!isFormValid}
-            className="btn-primary mt-2 w-full"
-          >
-            Calcular Comissão Mensal
-          </button>
+            {/* Calculate Button */}
+            <button
+              onClick={handleCalculate}
+              disabled={!isFormValid}
+              className="btn-primary mt-2 w-full"
+            >
+              Calcular Comissão Mensal
+            </button>
+          </div>
+
+          {/* Result */}
+          {showResult && result !== null && (
+            <ResultDisplay value={result} />
+          )}
         </div>
-
-        {/* Result */}
-        {showResult && result !== null && (
-          <ResultDisplay value={result} />
-        )}
       </div>
     </div>
   );

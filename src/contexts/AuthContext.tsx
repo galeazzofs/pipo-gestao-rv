@@ -16,6 +16,8 @@ interface AuthContextType {
   isAdmin: boolean;
   loading: boolean;
   signInWithMagicLink: (email: string) => Promise<{ error: Error | null }>;
+  signInWithPassword: (email: string, password: string) => Promise<{ error: Error | null }>;
+  checkIfAdmin: (email: string) => Promise<boolean>;
   signOut: () => Promise<void>;
 }
 
@@ -65,6 +67,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     return !!data;
+  };
+
+  // Check if an email belongs to an admin (for login flow)
+  const checkIfAdmin = async (email: string): Promise<boolean> => {
+    try {
+      // Query profiles to find user with this email, then check their role
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (profileError || !profileData) {
+        return false;
+      }
+
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', profileData.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+
+      if (roleError) {
+        return false;
+      }
+
+      return !!roleData;
+    } catch {
+      return false;
+    }
   };
 
   useEffect(() => {
@@ -125,6 +158,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error };
   };
 
+  const signInWithPassword = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    return { error };
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -142,6 +183,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isAdmin,
         loading,
         signInWithMagicLink,
+        signInWithPassword,
+        checkIfAdmin,
         signOut,
       }}
     >

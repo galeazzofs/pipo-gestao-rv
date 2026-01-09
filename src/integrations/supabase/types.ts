@@ -131,6 +131,179 @@ export type Database = {
         }
         Relationships: []
       }
+      apuracoes_fechadas: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          data_fechamento: string | null
+          id: string
+          mes_referencia: string
+          tipo: Database["public"]["Enums"]["tipo_apuracao"]
+          total_cns: number | null
+          total_evs: number | null
+          total_geral: number | null
+          total_lideranca: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          data_fechamento?: string | null
+          id?: string
+          mes_referencia: string
+          tipo: Database["public"]["Enums"]["tipo_apuracao"]
+          total_cns?: number | null
+          total_evs?: number | null
+          total_geral?: number | null
+          total_lideranca?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          data_fechamento?: string | null
+          id?: string
+          mes_referencia?: string
+          tipo?: Database["public"]["Enums"]["tipo_apuracao"]
+          total_cns?: number | null
+          total_evs?: number | null
+          total_geral?: number | null
+          total_lideranca?: number | null
+        }
+        Relationships: []
+      }
+      apuracoes_fechadas_itens: {
+        Row: {
+          apuracao_id: string
+          bonus_ev: number | null
+          bonus_lideranca: number | null
+          bonus_trimestral: number | null
+          colaborador_id: string
+          comissao_base: number | null
+          comissao_safra: number | null
+          created_at: string | null
+          id: string
+          multiplicador: number | null
+          multiplicador_meta: number | null
+          observacoes: string | null
+          pct_sao: number | null
+          pct_vidas: number | null
+          sao_meta: number | null
+          sao_realizado: number | null
+          score_final: number | null
+          total_pagar: number
+          vidas_meta: number | null
+          vidas_realizado: number | null
+        }
+        Insert: {
+          apuracao_id: string
+          bonus_ev?: number | null
+          bonus_lideranca?: number | null
+          bonus_trimestral?: number | null
+          colaborador_id: string
+          comissao_base?: number | null
+          comissao_safra?: number | null
+          created_at?: string | null
+          id?: string
+          multiplicador?: number | null
+          multiplicador_meta?: number | null
+          observacoes?: string | null
+          pct_sao?: number | null
+          pct_vidas?: number | null
+          sao_meta?: number | null
+          sao_realizado?: number | null
+          score_final?: number | null
+          total_pagar?: number
+          vidas_meta?: number | null
+          vidas_realizado?: number | null
+        }
+        Update: {
+          apuracao_id?: string
+          bonus_ev?: number | null
+          bonus_lideranca?: number | null
+          bonus_trimestral?: number | null
+          colaborador_id?: string
+          comissao_base?: number | null
+          comissao_safra?: number | null
+          created_at?: string | null
+          id?: string
+          multiplicador?: number | null
+          multiplicador_meta?: number | null
+          observacoes?: string | null
+          pct_sao?: number | null
+          pct_vidas?: number | null
+          sao_meta?: number | null
+          sao_realizado?: number | null
+          score_final?: number | null
+          total_pagar?: number
+          vidas_meta?: number | null
+          vidas_realizado?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apuracoes_fechadas_itens_apuracao_id_fkey"
+            columns: ["apuracao_id"]
+            isOneToOne: false
+            referencedRelation: "apuracoes_fechadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "apuracoes_fechadas_itens_colaborador_id_fkey"
+            columns: ["colaborador_id"]
+            isOneToOne: false
+            referencedRelation: "colaboradores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      colaboradores: {
+        Row: {
+          ativo: boolean | null
+          cargo: Database["public"]["Enums"]["cargo_type"]
+          created_at: string | null
+          created_by: string | null
+          email: string
+          id: string
+          lider_id: string | null
+          nivel: string | null
+          nome: string
+          salario_base: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          cargo: Database["public"]["Enums"]["cargo_type"]
+          created_at?: string | null
+          created_by?: string | null
+          email: string
+          id?: string
+          lider_id?: string | null
+          nivel?: string | null
+          nome: string
+          salario_base?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          cargo?: Database["public"]["Enums"]["cargo_type"]
+          created_at?: string | null
+          created_by?: string | null
+          email?: string
+          id?: string
+          lider_id?: string | null
+          nivel?: string | null
+          nome?: string
+          salario_base?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "colaboradores_lider_id_fkey"
+            columns: ["lider_id"]
+            isOneToOne: false
+            referencedRelation: "colaboradores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ev_contracts: {
         Row: {
           atingimento: number
@@ -236,7 +409,9 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "cn"
+      cargo_type: "CN" | "EV" | "Lideranca"
       cn_level: "CN1" | "CN2" | "CN3"
+      tipo_apuracao: "mensal" | "trimestral"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -365,7 +540,9 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "cn"],
+      cargo_type: ["CN", "EV", "Lideranca"],
       cn_level: ["CN1", "CN2", "CN3"],
+      tipo_apuracao: ["mensal", "trimestral"],
     },
   },
 } as const

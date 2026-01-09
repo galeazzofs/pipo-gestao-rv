@@ -1,16 +1,16 @@
-import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { useColaboradores } from '@/hooks/useColaboradores';
-import { Button } from '@/components/ui/button';
+import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useColaboradores } from "@/hooks/useColaboradores";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+} from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   Calculator,
   FileSpreadsheet,
@@ -24,8 +24,8 @@ import {
   Users,
   CalendarCheck,
   Wallet,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface NavLinkItem {
   label: string;
@@ -35,19 +35,19 @@ interface NavLinkItem {
 
 // Links para área "Minha Comissão" (todos usuários)
 const userLinks: NavLinkItem[] = [
-  { label: 'Início', href: '/', icon: Home },
-  { label: 'Simulador', href: '/minha-comissao/simulador', icon: Calculator },
-  { label: 'Previsão', href: '/minha-comissao/previsao', icon: TrendingUp },
-  { label: 'Histórico', href: '/minha-comissao/historico', icon: History },
+  { label: "Início", href: "/", icon: Home },
+  { label: "Simulador", href: "/minha-comissao/simulador", icon: Calculator },
+  { label: "Previsão", href: "/minha-comissao/previsao", icon: TrendingUp },
+  { label: "Histórico", href: "/minha-comissao/historico", icon: History },
 ];
 
 // Links para área "Hub de Apuração" (admins e liderança)
 const adminLinks: NavLinkItem[] = [
-  { label: 'Time', href: '/hub/time', icon: Users },
-  { label: 'Mensal', href: '/hub/apuracao-mensal', icon: Receipt },
-  { label: 'Trimestral', href: '/hub/apuracao-trimestral', icon: CalendarCheck },
-  { label: 'Contratos', href: '/hub/contratos', icon: FileSpreadsheet },
-  { label: 'Histórico', href: '/hub/historico', icon: History },
+  { label: "Time", href: "/hub/time", icon: Users },
+  { label: "Mensal", href: "/hub/apuracao-mensal", icon: Receipt },
+  { label: "Trimestral", href: "/hub/apuracao-trimestral", icon: CalendarCheck },
+  { label: "Contratos", href: "/hub/contratos", icon: FileSpreadsheet },
+  { label: "Histórico", href: "/hub/historico", icon: History },
 ];
 
 export function Navbar() {
@@ -57,12 +57,12 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Check if user is Liderança
-  const colaborador = colaboradores.find(c => c.email === user?.email);
-  const isLider = colaborador?.cargo === 'Lideranca';
+  const colaborador = colaboradores.find((c) => c.email === user?.email);
+  const isLider = colaborador?.cargo === "Lideranca";
   const canAccessHub = isAdmin || isLider;
 
   const isActive = (href: string) => {
-    if (href === '/') return location.pathname === '/';
+    if (href === "/") return location.pathname === "/";
     return location.pathname.startsWith(href);
   };
 
@@ -74,10 +74,10 @@ export function Navbar() {
       <Link
         to={link.href}
         className={cn(
-          'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200',
+          "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
           active
-            ? 'bg-primary text-primary-foreground shadow-sm'
-            : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+            ? "bg-primary text-primary-foreground shadow-sm"
+            : "text-muted-foreground hover:text-foreground hover:bg-accent",
         )}
         onClick={() => setMobileMenuOpen(false)}
       >
@@ -96,9 +96,7 @@ export function Navbar() {
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-sm group-hover:shadow-md transition-shadow">
               <Wallet className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="text-lg font-bold text-foreground hidden sm:block">
-              ComissõesPro
-            </span>
+            <span className="text-lg font-bold text-foreground hidden sm:block">Hub RV</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -109,11 +107,11 @@ export function Navbar() {
                 <NavLink key={link.href} link={link} />
               ))}
             </div>
-            
+
             {canAccessHub && (
               <>
                 <div className="h-8 w-px bg-border mx-3" />
-                
+
                 {/* Seção Hub de Apuração */}
                 <div className="flex items-center gap-0.5 px-2 py-1 rounded-xl bg-muted/50">
                   <span className="text-xs font-medium text-muted-foreground px-2 hidden xl:block">Hub</span>
@@ -133,15 +131,15 @@ export function Navbar() {
                 <Button variant="ghost" size="sm" className="gap-2 h-10 px-3 hover:bg-accent">
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 ring-2 ring-primary/20">
                     <span className="text-sm font-semibold text-primary">
-                      {profile?.nome?.charAt(0).toUpperCase() || 'U'}
+                      {profile?.nome?.charAt(0).toUpperCase() || "U"}
                     </span>
                   </div>
                   <div className="hidden sm:flex flex-col items-start">
                     <span className="text-sm font-medium text-foreground leading-none">
-                      {profile?.nome?.split(' ')[0] || 'Usuário'}
+                      {profile?.nome?.split(" ")[0] || "Usuário"}
                     </span>
                     <span className="text-xs text-muted-foreground leading-none mt-0.5">
-                      {isAdmin ? 'Administrador' : isLider ? 'Liderança' : 'Colaborador'}
+                      {isAdmin ? "Administrador" : isLider ? "Liderança" : "Colaborador"}
                     </span>
                   </div>
                   <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -153,8 +151,8 @@ export function Navbar() {
                   <p className="text-xs text-muted-foreground">{profile?.email}</p>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  onClick={signOut} 
+                <DropdownMenuItem
+                  onClick={signOut}
                   className="text-destructive cursor-pointer focus:text-destructive focus:bg-destructive/10"
                 >
                   <LogOut className="h-4 w-4 mr-2" />
@@ -176,14 +174,14 @@ export function Navbar() {
                   <div className="flex items-center gap-3 p-6 border-b border-border bg-muted/30">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 ring-2 ring-primary/20">
                       <span className="text-lg font-semibold text-primary">
-                        {profile?.nome?.charAt(0).toUpperCase() || 'U'}
+                        {profile?.nome?.charAt(0).toUpperCase() || "U"}
                       </span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold truncate">{profile?.nome}</p>
                       <p className="text-xs text-muted-foreground truncate">{profile?.email}</p>
                       <span className="inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                        {isAdmin ? 'Administrador' : isLider ? 'Liderança' : 'Colaborador'}
+                        {isAdmin ? "Administrador" : isLider ? "Liderança" : "Colaborador"}
                       </span>
                     </div>
                   </div>
@@ -205,10 +203,8 @@ export function Navbar() {
                               to={link.href}
                               onClick={() => setMobileMenuOpen(false)}
                               className={cn(
-                                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                                active
-                                  ? 'bg-primary text-primary-foreground'
-                                  : 'text-foreground hover:bg-accent'
+                                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                                active ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-accent",
                               )}
                             >
                               <Icon className="h-5 w-5" />
@@ -235,10 +231,8 @@ export function Navbar() {
                                 to={link.href}
                                 onClick={() => setMobileMenuOpen(false)}
                                 className={cn(
-                                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                                  active
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'text-foreground hover:bg-accent'
+                                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                                  active ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-accent",
                                 )}
                               >
                                 <Icon className="h-5 w-5" />

@@ -12,68 +12,87 @@ import {
   BarChart3,
   Users,
   TrendingUp,
-  Receipt
+  Receipt,
+  CalendarCheck
 } from 'lucide-react';
 
 const Landing = () => {
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
 
-  const publicFeatures = [
+  // Área "Minha Comissão" - todos usuários
+  const userFeatures = [
     {
-      title: 'Calculadora CN',
-      description: 'Calcule comissões mensais baseadas em SAOs e Vidas para consultores de nível CN1, CN2 e CN3.',
+      title: 'Simulador de Comissão',
+      description: 'Calcule e simule suas comissões mensais baseadas em SAOs e Vidas.',
       icon: Calculator,
-      href: '/calculadora-cn',
+      href: '/minha-comissao/simulador',
       color: 'bg-blue-500/10 text-blue-600',
       borderColor: 'hover:border-blue-500/30',
     },
     {
-      title: 'Minha Previsibilidade',
-      description: 'Veja quanto ainda tem a receber dos seus contratos ativos e identifique riscos de churn.',
+      title: 'Previsibilidade',
+      description: 'Veja quanto ainda tem a receber dos contratos ativos.',
       icon: TrendingUp,
-      href: '/previsibilidade',
+      href: '/minha-comissao/previsao',
       color: 'bg-cyan-500/10 text-cyan-600',
       borderColor: 'hover:border-cyan-500/30',
     },
+    {
+      title: 'Meus Resultados',
+      description: 'Consulte seu histórico de comissões fechadas.',
+      icon: History,
+      href: '/minha-comissao/historico',
+      color: 'bg-amber-500/10 text-amber-600',
+      borderColor: 'hover:border-amber-500/30',
+    },
   ];
 
+  // Área "Hub de Apuração" - apenas admins
   const adminFeatures = [
     {
-      title: 'Base de Contratos',
-      description: 'Gerencie sua carteira de contratos de EVs, importe dados via Excel e acompanhe vigências.',
-      icon: FileSpreadsheet,
-      href: '/ev/contratos',
-      color: 'bg-emerald-500/10 text-emerald-600',
-      borderColor: 'hover:border-emerald-500/30',
+      title: 'Gestão de Time',
+      description: 'Cadastre e gerencie colaboradores: CNs, EVs e Liderança.',
+      icon: Users,
+      href: '/hub/time',
+      color: 'bg-purple-500/10 text-purple-600',
+      borderColor: 'hover:border-purple-500/30',
     },
     {
       title: 'Apuração Mensal',
-      description: 'Processe arquivos de comissão, calcule valores e salve apurações para consulta.',
+      description: 'Fechamento mensal de comissões dos CNs.',
       icon: Receipt,
-      href: '/ev/apuracao',
+      href: '/hub/apuracao-mensal',
       color: 'bg-orange-500/10 text-orange-600',
       borderColor: 'hover:border-orange-500/30',
     },
     {
-      title: 'Histórico',
-      description: 'Consulte apurações anteriores, filtre por mês, EV ou cliente e acompanhe a evolução.',
-      icon: History,
-      href: '/historico',
-      color: 'bg-amber-500/10 text-amber-600',
-      borderColor: 'hover:border-amber-500/30',
+      title: 'Apuração Trimestral',
+      description: 'Fechamento completo: CNs + EVs + Liderança.',
+      icon: CalendarCheck,
+      href: '/hub/apuracao-trimestral',
+      color: 'bg-emerald-500/10 text-emerald-600',
+      borderColor: 'hover:border-emerald-500/30',
+    },
+    {
+      title: 'Contratos EV',
+      description: 'Gerencie contratos, importe dados e acompanhe vigências.',
+      icon: FileSpreadsheet,
+      href: '/hub/contratos',
+      color: 'bg-indigo-500/10 text-indigo-600',
+      borderColor: 'hover:border-indigo-500/30',
     },
     {
       title: 'Administração',
-      description: 'Gerencie usuários, permissões e configurações do sistema.',
+      description: 'Gerencie usuários e configurações do sistema.',
       icon: Shield,
       href: '/admin',
-      color: 'bg-purple-500/10 text-purple-600',
-      borderColor: 'hover:border-purple-500/30',
+      color: 'bg-rose-500/10 text-rose-600',
+      borderColor: 'hover:border-rose-500/30',
     },
   ];
 
-  const features = isAdmin ? [...publicFeatures, ...adminFeatures] : publicFeatures;
+  const features = isAdmin ? [...userFeatures, ...adminFeatures] : userFeatures;
 
   const stats = [
     { icon: Zap, label: 'Processamento Rápido', value: 'Instantâneo' },

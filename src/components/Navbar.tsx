@@ -22,6 +22,8 @@ import {
   LogOut,
   User,
   Home,
+  Users,
+  CalendarCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -32,16 +34,20 @@ interface NavLinkItem {
   adminOnly?: boolean;
 }
 
-const publicLinks: NavLinkItem[] = [
+// Links para área "Minha Comissão" (todos usuários)
+const userLinks: NavLinkItem[] = [
   { label: 'Início', href: '/', icon: Home },
-  { label: 'Calculadora CN', href: '/calculadora-cn', icon: Calculator },
-  { label: 'Previsibilidade', href: '/previsibilidade', icon: TrendingUp },
+  { label: 'Simulador', href: '/minha-comissao/simulador', icon: Calculator },
+  { label: 'Previsibilidade', href: '/minha-comissao/previsao', icon: TrendingUp },
+  { label: 'Meus Resultados', href: '/minha-comissao/historico', icon: History },
 ];
 
+// Links para área "Hub de Apuração" (apenas admins)
 const adminLinks: NavLinkItem[] = [
-  { label: 'Contratos', href: '/ev/contratos', icon: FileSpreadsheet, adminOnly: true },
-  { label: 'Apuração', href: '/ev/apuracao', icon: Receipt, adminOnly: true },
-  { label: 'Histórico', href: '/historico', icon: History, adminOnly: true },
+  { label: 'Gestão de Time', href: '/hub/time', icon: Users, adminOnly: true },
+  { label: 'Apuração Mensal', href: '/hub/apuracao-mensal', icon: Receipt, adminOnly: true },
+  { label: 'Apuração Trimestral', href: '/hub/apuracao-trimestral', icon: CalendarCheck, adminOnly: true },
+  { label: 'Contratos EV', href: '/hub/contratos', icon: FileSpreadsheet, adminOnly: true },
   { label: 'Admin', href: '/admin', icon: Shield, adminOnly: true },
 ];
 
@@ -76,7 +82,7 @@ export function Navbar() {
     );
   };
 
-  const allLinks = isAdmin ? [...publicLinks, ...adminLinks] : publicLinks;
+  const allLinks = isAdmin ? [...userLinks, ...adminLinks] : userLinks;
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
@@ -94,7 +100,7 @@ export function Navbar() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-1">
-            {publicLinks.map((link) => (
+            {userLinks.map((link) => (
               <NavLink key={link.href} link={link} />
             ))}
             
@@ -159,9 +165,9 @@ export function Navbar() {
                   {/* Navigation Links */}
                   <nav className="flex flex-col gap-1 py-4 flex-1">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2">
-                      Menu
+                      Minha Comissão
                     </p>
-                    {publicLinks.map((link) => (
+                    {userLinks.map((link) => (
                       <NavLink key={link.href} link={link} />
                     ))}
 
@@ -169,7 +175,7 @@ export function Navbar() {
                       <>
                         <div className="h-px bg-border my-4" />
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2">
-                          Administração
+                          Hub de Apuração
                         </p>
                         {adminLinks.map((link) => (
                           <NavLink key={link.href} link={link} />

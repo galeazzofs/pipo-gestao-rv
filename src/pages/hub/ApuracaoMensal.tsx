@@ -303,72 +303,82 @@ export default function ApuracaoMensal() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {cns.map((cn) => {
-                      const row = rows[cn.id] || {};
-                      const nivel = (cn.nivel || 'CN1') as CNLevel;
-                      const target = CN_TARGETS[nivel];
+                      {cns.map((cn) => {
+                        const row = rows[cn.id] || {
+                          saoMeta: '',
+                          saoRealizado: '',
+                          vidasMeta: '',
+                          vidasRealizado: '',
+                          comissao: 0,
+                          pctSAO: 0,
+                          pctVidas: 0,
+                          scoreFinal: 0,
+                          multiplicador: 0,
+                        };
+                        const nivel = (cn.nivel || 'CN1') as CNLevel;
+                        const target = CN_TARGETS[nivel];
 
-                      return (
-                        <TableRow key={cn.id}>
-                          <TableCell className="font-medium">{cn.nome}</TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant="outline">{nivel}</Badge>
-                          </TableCell>
-                          <TableCell className="text-center text-muted-foreground">
-                            {formatCurrency(target)}
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              min="0"
-                              placeholder="0"
-                              value={row.saoMeta || ''}
-                              onChange={(e) => updateRow(cn.id, 'saoMeta', e.target.value)}
-                              className="w-20 text-center"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              min="0"
-                              placeholder="0"
-                              value={row.saoRealizado || ''}
-                              onChange={(e) => updateRow(cn.id, 'saoRealizado', e.target.value)}
-                              className="w-20 text-center"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              min="0"
-                              placeholder="0"
-                              value={row.vidasMeta || ''}
-                              onChange={(e) => updateRow(cn.id, 'vidasMeta', e.target.value)}
-                              className="w-20 text-center"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              min="0"
-                              placeholder="0"
-                              value={row.vidasRealizado || ''}
-                              onChange={(e) => updateRow(cn.id, 'vidasRealizado', e.target.value)}
-                              className="w-20 text-center"
-                            />
-                          </TableCell>
-                          <TableCell className="text-center font-medium">
-                            {row.scoreFinal ? formatPercentage(row.scoreFinal) : '-'}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {row.multiplicador ? formatPercentage(row.multiplicador) : '-'}
-                          </TableCell>
-                          <TableCell className="text-right font-bold text-success">
-                            {row.comissao ? formatCurrency(row.comissao) : '-'}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                        return (
+                          <TableRow key={cn.id}>
+                            <TableCell className="font-medium">{cn.nome}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="outline">{nivel}</Badge>
+                            </TableCell>
+                            <TableCell className="text-center text-muted-foreground">
+                              {formatCurrency(target)}
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={row.saoMeta}
+                                onChange={(e) => updateRow(cn.id, 'saoMeta', e.target.value)}
+                                className="w-20 text-center"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={row.saoRealizado}
+                                onChange={(e) => updateRow(cn.id, 'saoRealizado', e.target.value)}
+                                className="w-20 text-center"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={row.vidasMeta}
+                                onChange={(e) => updateRow(cn.id, 'vidasMeta', e.target.value)}
+                                className="w-20 text-center"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={row.vidasRealizado}
+                                onChange={(e) => updateRow(cn.id, 'vidasRealizado', e.target.value)}
+                                className="w-20 text-center"
+                              />
+                            </TableCell>
+                            <TableCell className="text-center font-medium">
+                              {row.scoreFinal ? formatPercentage(row.scoreFinal) : '-'}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {row.multiplicador ? formatPercentage(row.multiplicador) : '-'}
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-success">
+                              {row.comissao ? formatCurrency(row.comissao) : '-'}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                   </TableBody>
                 </Table>
               </div>

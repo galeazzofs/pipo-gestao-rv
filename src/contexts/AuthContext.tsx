@@ -1,9 +1,10 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { isDevModeEnabled } from '@/hooks/useDevMode';
 
-// Detectar se estamos no preview do Lovable (desenvolvimento)
-const IS_DEV_MODE = import.meta.env.DEV;
+// Detectar se estamos no preview do Lovable (desenvolvimento) E com dev mode ativo
+const IS_DEV_MODE = import.meta.env.DEV && isDevModeEnabled();
 
 interface Profile {
   id: string;

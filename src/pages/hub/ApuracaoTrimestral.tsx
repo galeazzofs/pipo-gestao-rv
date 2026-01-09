@@ -23,6 +23,11 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { 
   CalendarCheck, 
   Calculator,
@@ -32,7 +37,6 @@ import {
   Briefcase,
   Crown,
   Info,
-  Upload
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ExcelDropzone } from '@/components/ev/ExcelDropzone';
@@ -60,6 +64,10 @@ interface CNRow {
   vidasMeta: string;
   vidasRealizado: string;
   comissao: number;
+  pctSAO: number;
+  pctVidas: number;
+  scoreFinal: number;
+  multiplicador: number;
   bonus: string;
   total: number;
 }
@@ -97,16 +105,28 @@ export default function ApuracaoTrimestral() {
   const [liderRows, setLiderRows] = useState<Record<string, LiderRow>>({});
   const [isProcessingExcel, setIsProcessingExcel] = useState(false);
 
-  // Handlers para CNs
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  };
+
+  const formatPercentage = (value: number) => {
+    return `${(value * 100).toFixed(1)}%`;
+  };
+
+  // Handlers para CNs (mesma lógica da ApuracaoMensal)
   const updateCNRow = (id: string, field: keyof CNRow, value: string) => {
     setCnRows(prev => {
       const current = prev[id] || {
         saoMeta: '', saoRealizado: '', vidasMeta: '', vidasRealizado: '',
-        comissao: 0, bonus: '0', total: 0
+        comissao: 0, pctSAO: 0, pctVidas: 0, scoreFinal: 0, multiplicador: 0,
+        bonus: '0', total: 0
       };
       const updated = { ...current, [field]: value };
 
-      // Recalcular
+      // Recalcular usando a mesma lógica da ApuracaoMensal
       const cn = cns.find(c => c.id === id);
       if (cn && updated.saoMeta && updated.saoRealizado && updated.vidasMeta && updated.vidasRealizado) {
         const nivel = (cn.nivel || 'CN1') as CNLevel;
@@ -118,6 +138,10 @@ export default function ApuracaoTrimestral() {
           parseFloat(updated.vidasRealizado) || 0
         );
         updated.comissao = resultado.comissao;
+        updated.pctSAO = resultado.details.pctSAO;
+        updated.pctVidas = resultado.details.pctVidas;
+        updated.scoreFinal = resultado.details.scoreFinal;
+        updated.multiplicador = resultado.details.multiplicador;
       }
       updated.total = updated.comissao + (parseFloat(updated.bonus) || 0);
 
@@ -145,13 +169,9 @@ export default function ApuracaoTrimestral() {
 
   // Handler para Excel dos EVs
   const handleExcelData = (data: ExcelRow[]) => {
-    // Simular processamento - em produção aqui entraria a lógica de safra
     setIsProcessingExcel(true);
-    
-    // Por enquanto, apenas log
     console.log('Dados do Excel:', data);
     toast.info(`${data.length} linhas processadas do Excel`);
-    
     setIsProcessingExcel(false);
   };
 
@@ -181,13 +201,6 @@ export default function ApuracaoTrimestral() {
 
   const totalGeral = totalCNs + totalEVs + totalLideranca;
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
-
   const handleSave = async () => {
     if (totalGeral === 0) {
       toast.error('Preencha pelo menos um valor para salvar');
@@ -209,6 +222,10 @@ export default function ApuracaoTrimestral() {
           sao_realizado: parseFloat(row.saoRealizado) || 0,
           vidas_meta: parseFloat(row.vidasMeta) || 0,
           vidas_realizado: parseFloat(row.vidasRealizado) || 0,
+          pct_sao: row.pctSAO,
+          pct_vidas: row.pctVidas,
+          score_final: row.scoreFinal,
+          multiplicador: row.multiplicador,
           comissao_base: row.comissao,
           bonus_trimestral: parseFloat(row.bonus) || 0,
           total_pagar: row.total,
@@ -328,14 +345,14 @@ export default function ApuracaoTrimestral() {
               </TabsTrigger>
             </TabsList>
 
-            {/* CNs Tab */}
+            {/* CNs Tab - Padronizado com ApuracaoMensal */}
             <TabsContent value="cns">
               <div className="card-premium p-4 mb-4 flex items-start gap-3 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
                 <Info className="w-5 h-5 text-blue-600 mt-0.5" />
                 <div className="text-sm">
-                  <p className="font-medium text-blue-800 dark:text-blue-300">Comissão Mês 3 + Bônus Trimestral</p>
+                  <p className="font-medium text-blue-800 dark:text-blue-300">Regra de Cálculo (Regra de Ouro)</p>
                   <p className="text-blue-700 dark:text-blue-400">
-                    Preencha os KPIs do último mês do trimestre. O bônus trimestral é um valor manual.
+                    Score = (SAO × 70%) + (Vidas × 30%, trava em 150%). O bônus trimestral é um valor manual adicional.
                   </p>
                 </div>
               </div>
@@ -354,29 +371,39 @@ export default function ApuracaoTrimestral() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Consultor</TableHead>
+                          <TableHead className="min-w-[140px]">Consultor</TableHead>
                           <TableHead className="text-center">Nível</TableHead>
+                          <TableHead className="text-center">Target</TableHead>
                           <TableHead className="text-center w-20">M SAO</TableHead>
                           <TableHead className="text-center w-20">R SAO</TableHead>
                           <TableHead className="text-center w-20">M Vidas</TableHead>
                           <TableHead className="text-center w-20">R Vidas</TableHead>
-                          <TableHead className="text-right">Comissão M3</TableHead>
-                          <TableHead className="text-center w-28">Bônus Tri</TableHead>
+                          <TableHead className="text-center">
+                            <Tooltip>
+                              <TooltipTrigger className="flex items-center gap-1 justify-center">
+                                Score
+                                <Info className="w-3 h-3" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>(SAO × 70%) + (Vidas × 30%)</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TableHead>
+                          <TableHead className="text-center">Mult.</TableHead>
+                          <TableHead className="text-right">Comissão</TableHead>
+                          <TableHead className="text-center w-24">Bônus Tri</TableHead>
                           <TableHead className="text-right">TOTAL</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {cns.map((cn) => {
                           const row: CNRow = cnRows[cn.id] || {
-                            saoMeta: '',
-                            saoRealizado: '',
-                            vidasMeta: '',
-                            vidasRealizado: '',
-                            comissao: 0,
-                            bonus: '0',
-                            total: 0
+                            saoMeta: '', saoRealizado: '', vidasMeta: '', vidasRealizado: '',
+                            comissao: 0, pctSAO: 0, pctVidas: 0, scoreFinal: 0, multiplicador: 0,
+                            bonus: '0', total: 0
                           };
                           const nivel = (cn.nivel || 'CN1') as CNLevel;
+                          const target = CN_TARGETS[nivel];
 
                           return (
                             <TableRow key={cn.id}>
@@ -384,10 +411,14 @@ export default function ApuracaoTrimestral() {
                               <TableCell className="text-center">
                                 <Badge variant="outline">{nivel}</Badge>
                               </TableCell>
+                              <TableCell className="text-center text-muted-foreground">
+                                {formatCurrency(target)}
+                              </TableCell>
                               <TableCell>
                                 <Input
                                   type="number"
                                   min="0"
+                                  placeholder="0"
                                   value={row.saoMeta}
                                   onChange={(e) => updateCNRow(cn.id, 'saoMeta', e.target.value)}
                                   className="w-16 text-center"
@@ -397,6 +428,7 @@ export default function ApuracaoTrimestral() {
                                 <Input
                                   type="number"
                                   min="0"
+                                  placeholder="0"
                                   value={row.saoRealizado}
                                   onChange={(e) => updateCNRow(cn.id, 'saoRealizado', e.target.value)}
                                   className="w-16 text-center"
@@ -406,6 +438,7 @@ export default function ApuracaoTrimestral() {
                                 <Input
                                   type="number"
                                   min="0"
+                                  placeholder="0"
                                   value={row.vidasMeta}
                                   onChange={(e) => updateCNRow(cn.id, 'vidasMeta', e.target.value)}
                                   className="w-16 text-center"
@@ -415,10 +448,17 @@ export default function ApuracaoTrimestral() {
                                 <Input
                                   type="number"
                                   min="0"
+                                  placeholder="0"
                                   value={row.vidasRealizado}
                                   onChange={(e) => updateCNRow(cn.id, 'vidasRealizado', e.target.value)}
                                   className="w-16 text-center"
                                 />
+                              </TableCell>
+                              <TableCell className="text-center font-medium">
+                                {row.scoreFinal ? formatPercentage(row.scoreFinal) : '-'}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {row.multiplicador ? formatPercentage(row.multiplicador) : '-'}
                               </TableCell>
                               <TableCell className="text-right font-medium">
                                 {row.comissao ? formatCurrency(row.comissao) : '-'}
@@ -429,7 +469,7 @@ export default function ApuracaoTrimestral() {
                                   min="0"
                                   value={row.bonus}
                                   onChange={(e) => updateCNRow(cn.id, 'bonus', e.target.value)}
-                                  className="w-24"
+                                  className="w-20"
                                   placeholder="R$ 0"
                                 />
                               </TableCell>

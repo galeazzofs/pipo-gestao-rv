@@ -9,12 +9,13 @@ import Login from "./pages/Login";
 import EVContratos from "./pages/EVContratos";
 import Previsibilidade from "./pages/Previsibilidade";
 import NotFound from "./pages/NotFound";
-import { AdminRoute } from "./components/AdminRoute";
+import { HubRoute } from "./components/HubRoute";
 
-// Hub de Apuração (Admin)
+// Hub de Apuração (Admin e Liderança)
 import GestaoTime from "./pages/hub/GestaoTime";
 import ApuracaoMensal from "./pages/hub/ApuracaoMensal";
 import ApuracaoTrimestral from "./pages/hub/ApuracaoTrimestral";
+import HistoricoApuracoes from "./pages/hub/HistoricoApuracoes";
 
 // Minha Comissão (Usuários)
 import Simulador from "./pages/minha-comissao/Simulador";
@@ -38,11 +39,12 @@ const App = () => (
             <Route path="/minha-comissao/previsao" element={<Previsibilidade />} />
             <Route path="/minha-comissao/historico" element={<MeusResultados />} />
             
-            {/* Hub de Apuração (apenas admins) */}
-            <Route path="/hub/time" element={<AdminRoute><GestaoTime /></AdminRoute>} />
-            <Route path="/hub/apuracao-mensal" element={<AdminRoute><ApuracaoMensal /></AdminRoute>} />
-            <Route path="/hub/apuracao-trimestral" element={<AdminRoute><ApuracaoTrimestral /></AdminRoute>} />
-            <Route path="/hub/contratos" element={<AdminRoute><EVContratos /></AdminRoute>} />
+            {/* Hub de Apuração (admins e liderança) */}
+            <Route path="/hub/time" element={<HubRoute><GestaoTime /></HubRoute>} />
+            <Route path="/hub/apuracao-mensal" element={<HubRoute><ApuracaoMensal /></HubRoute>} />
+            <Route path="/hub/apuracao-trimestral" element={<HubRoute><ApuracaoTrimestral /></HubRoute>} />
+            <Route path="/hub/contratos" element={<EVContratos />} />
+            <Route path="/hub/historico" element={<HistoricoApuracoes />} />
             
             {/* Legacy routes - redirect to new paths */}
             <Route path="/calculadora-cn" element={<Navigate to="/minha-comissao/simulador" replace />} />
@@ -50,7 +52,7 @@ const App = () => (
             <Route path="/ev/contratos" element={<Navigate to="/hub/contratos" replace />} />
             <Route path="/ev/apuracao" element={<Navigate to="/hub/apuracao-mensal" replace />} />
             <Route path="/ev-calculator" element={<Navigate to="/hub/contratos" replace />} />
-            <Route path="/historico" element={<Navigate to="/hub/apuracao-mensal" replace />} />
+            <Route path="/historico" element={<Navigate to="/hub/historico" replace />} />
             <Route path="/admin" element={<Navigate to="/hub/time" replace />} />
             
             <Route path="*" element={<NotFound />} />

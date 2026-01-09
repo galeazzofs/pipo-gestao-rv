@@ -108,11 +108,8 @@ export default function Simulador() {
                   </div>
                   <div className="flex-1">
                     <p className="font-semibold text-foreground">{nome}</p>
-                    <div className="flex items-center gap-3 mt-1">
+                  <div className="flex items-center gap-3 mt-1">
                       <Badge variant="secondary">{nivel}</Badge>
-                      <span className="text-sm text-muted-foreground">
-                        Target: {formatCurrency(target)}
-                      </span>
                     </div>
                   </div>
                 </div>

@@ -2,12 +2,30 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
+// Detectar se estamos no preview do Lovable (desenvolvimento)
+const IS_DEV_MODE = import.meta.env.DEV;
+
 interface Profile {
   id: string;
   email: string;
   nome: string;
   nivel: 'CN1' | 'CN2' | 'CN3';
 }
+
+// Usuário mock para desenvolvimento
+const DEV_USER = {
+  id: 'dev-user-id',
+  email: 'dev@piposaude.com.br',
+  aud: 'authenticated',
+  role: 'authenticated',
+} as User;
+
+const DEV_PROFILE: Profile = {
+  id: 'dev-user-id',
+  email: 'dev@piposaude.com.br',
+  nome: 'Modo Dev (Admin)',
+  nivel: 'CN1',
+};
 
 interface AuthContextType {
   user: User | null;
@@ -32,6 +50,27 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  // Se estiver em modo desenvolvimento, simular usuário admin
+  if (IS_DEV_MODE) {
+    return (
+      <AuthContext.Provider
+        value={{
+          user: DEV_USER,
+          session: null,
+          profile: DEV_PROFILE,
+          isAdmin: true,
+          loading: false,
+          signInWithMagicLink: async () => ({ error: null }),
+          signInWithPassword: async () => ({ error: null }),
+          checkIfAdmin: async () => true,
+          signOut: async () => {},
+        }}
+      >
+        {children}
+      </AuthContext.Provider>
+    );
+  }
+
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);

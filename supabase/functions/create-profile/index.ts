@@ -1,19 +1,55 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+// Allowed origins for CORS
+const ALLOWED_ORIGINS = [
+  "https://lovable.dev",
+  "https://preview--bxqihukgmrzkclfinnfr.lovable.app",
+  "https://bxqihukgmrzkclfinnfr.lovable.app",
+];
+
+const getCorsHeaders = (origin: string | null) => {
+  const isAllowed = origin && ALLOWED_ORIGINS.some(allowed => 
+    origin === allowed || origin.endsWith('.lovable.app') || origin.endsWith('.lovable.dev')
+  );
+  return {
+    "Access-Control-Allow-Origin": isAllowed ? origin : ALLOWED_ORIGINS[0],
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
 };
 
-interface CreateProfileRequest {
-  email: string;
-  nome: string;
-  nivel: "CN1" | "CN2" | "CN3";
+// Input validation schema
+const createProfileSchema = z.object({
+  email: z.string().email("Invalid email format").max(255, "Email too long"),
+  nome: z.string().min(1, "Name is required").max(255, "Name too long"),
+  nivel: z.enum(["CN1", "CN2", "CN3"], { errorMap: () => ({ message: "Invalid nivel value" }) }),
+});
+
+// Safe error message mapping - never expose raw errors
+function getSafeErrorMessage(error: unknown): string {
+  const message = (error as Error)?.message?.toLowerCase() || "";
+  
+  if (message.includes("duplicate") || message.includes("already exists") || message.includes("already been registered")) {
+    return "User already exists";
+  }
+  if (message.includes("foreign key") || (error as { code?: string })?.code === "23503") {
+    return "Invalid reference";
+  }
+  if (message.includes("violates") || (error as { code?: string })?.code?.startsWith("23")) {
+    return "Data validation failed";
+  }
+  if (message.includes("auth") || message.includes("jwt")) {
+    return "Authentication failed";
+  }
+  return "An error occurred while processing your request";
 }
 
 const handler = async (req: Request): Promise<Response> => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -65,10 +101,21 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Parse and validate input
+    const body = await req.json();
+    const validationResult = createProfileSchema.safeParse(body);
+    
+    if (!validationResult.success) {
+      return new Response(
+        JSON.stringify({ error: "Invalid input", details: validationResult.error.issues.map(i => i.message) }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { email, nome, nivel } = validationResult.data;
+
     // Use service role client for admin operations
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
-
-    const { email, nome, nivel }: CreateProfileRequest = await req.json();
 
     // Create user via admin API
     const { data: newUser, error: createUserError } = await adminClient.auth.admin.createUser({
@@ -166,10 +213,14 @@ const handler = async (req: Request): Promise<Response> => {
       JSON.stringify({ success: true, userId: newUser.user.id }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (error: any) {
-    console.error("Error in create-profile function:", error);
+  } catch (error: unknown) {
+    console.error("Error in create-profile function:", {
+      message: (error as Error)?.message,
+      code: (error as { code?: string })?.code,
+      stack: (error as Error)?.stack,
+    });
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: getSafeErrorMessage(error) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

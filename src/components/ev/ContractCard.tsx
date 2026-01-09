@@ -1,9 +1,9 @@
-import { Trash2 } from 'lucide-react';
+import { Trash2, Clock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { format, parseISO, differenceInMonths, addMonths, isBefore } from 'date-fns';
+import { format, parseISO, addMonths, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Contract } from '@/lib/evCalculations';
@@ -18,18 +18,22 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { ContractApuracaoInfo } from '@/hooks/useContractApuracoes';
 
 interface ContractCardProps {
   contract: Contract;
   onDelete?: (id: string) => void;
+  apuracaoInfo?: ContractApuracaoInfo | null;
 }
 
-export function ContractCard({ contract, onDelete }: ContractCardProps) {
+export function ContractCard({ contract, onDelete, apuracaoInfo }: ContractCardProps) {
   const dataInicio = parseISO(contract.dataInicio);
   const dataFim = addMonths(dataInicio, 12);
   const now = new Date();
   
-  const mesesDecorridos = Math.min(12, Math.max(0, differenceInMonths(now, dataInicio) + 1));
+  // Só contar meses se houver apuração processada
+  const temApuracao = apuracaoInfo && apuracaoInfo.mesesProcessados > 0;
+  const mesesDecorridos = temApuracao ? Math.min(12, apuracaoInfo.mesesProcessados) : 0;
   const isActive = isBefore(now, dataFim);
   const progressPercent = (mesesDecorridos / 12) * 100;
 
@@ -96,11 +100,18 @@ export function ContractCard({ contract, onDelete }: ContractCardProps) {
             </span>
           </div>
           <Progress value={progressPercent} className="h-2" />
-          <p className="text-xs text-muted-foreground mt-1">
-            {12 - mesesDecorridos > 0
-              ? `Faltam ${12 - mesesDecorridos} mês${12 - mesesDecorridos > 1 ? 'es' : ''}`
-              : 'Vigência completa'}
-          </p>
+          {temApuracao ? (
+            <p className="text-xs text-muted-foreground mt-1">
+              {12 - mesesDecorridos > 0
+                ? `Faltam ${12 - mesesDecorridos} ${12 - mesesDecorridos > 1 ? 'meses' : 'mes'}`
+                : 'Vigência completa'}
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              Aguardando primeira apuração
+            </p>
+          )}
         </div>
 
         {/* Details */}

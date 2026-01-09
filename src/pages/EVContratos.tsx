@@ -13,11 +13,13 @@ import { ContractForm } from '@/components/ev/ContractForm';
 import { ContractExcelUpload } from '@/components/ev/ContractExcelUpload';
 import { ContractCard } from '@/components/ev/ContractCard';
 import { useContracts } from '@/hooks/useContracts';
+import { useContractApuracoes } from '@/hooks/useContractApuracoes';
 import { parseISO, addMonths, isBefore } from 'date-fns';
 import { Contract } from '@/lib/evCalculations';
 
 function EVContratosContent() {
   const { contracts, isLoading, addContract, addContracts, deleteContract, getUniqueEVNames } = useContracts();
+  const { apuracaoInfo, isLoading: isLoadingApuracoes, getContractInfo } = useContractApuracoes();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isExcelOpen, setIsExcelOpen] = useState(false);
   const [showInativos, setShowInativos] = useState(false);
@@ -67,7 +69,7 @@ function EVContratosContent() {
     setIsExcelOpen(false);
   };
 
-  if (isLoading) {
+  if (isLoading || isLoadingApuracoes) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -241,6 +243,7 @@ function EVContratosContent() {
                   key={contract.id}
                   contract={contract}
                   onDelete={deleteContract}
+                  apuracaoInfo={getContractInfo(contract.id)}
                 />
               ))}
             </div>
@@ -270,6 +273,7 @@ function EVContratosContent() {
                     key={contract.id}
                     contract={contract}
                     onDelete={deleteContract}
+                    apuracaoInfo={getContractInfo(contract.id)}
                   />
                 ))}
               </div>

@@ -1,16 +1,17 @@
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { History, Receipt, CalendarCheck, DollarSign, Users, ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
+import { History, Receipt, CalendarCheck, DollarSign, Users, ChevronDown, ChevronRight, Trash2, Crown, Briefcase, FileEdit } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Navbar } from '@/components/Navbar';
 import { HubRoute } from '@/components/HubRoute';
-import { useApuracoesFechadas } from '@/hooks/useApuracoesFechadas';
+import { useApuracoesFechadas, ApuracaoFechadaItem } from '@/hooks/useApuracoesFechadas';
 import { formatCurrency } from '@/lib/evCalculations';
 import {
   AlertDialog,
@@ -23,18 +24,31 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 function HistoricoApuracoesContent() {
   const { apuracoes, isLoading, deleteApuracao, getApuracaoItens } = useApuracoesFechadas();
   const [selectedTipo, setSelectedTipo] = useState<string>('all');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [expandedItens, setExpandedItens] = useState<Record<string, any[]>>({});
+  const [expandedItens, setExpandedItens] = useState<Record<string, ApuracaoFechadaItem[]>>({});
+  const [activeDetailTab, setActiveDetailTab] = useState<string>('cns');
 
   // Filter apuracoes
   const filteredApuracoes = useMemo(() => {
-    if (selectedTipo === 'all') return apuracoes;
-    return apuracoes.filter(a => a.tipo === selectedTipo);
-  }, [apuracoes, selectedTipo]);
+    return apuracoes.filter(a => {
+      const tipoMatch = selectedTipo === 'all' || a.tipo === selectedTipo;
+      const statusMatch = selectedStatus === 'all' || a.status === selectedStatus;
+      return tipoMatch && statusMatch;
+    });
+  }, [apuracoes, selectedTipo, selectedStatus]);
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -64,6 +78,14 @@ function HistoricoApuracoesContent() {
 
   const handleDelete = async (id: string) => {
     await deleteApuracao(id);
+  };
+
+  // Group items by cargo
+  const groupItemsByCargo = (itens: ApuracaoFechadaItem[]) => {
+    const cns = itens.filter(i => i.colaborador?.cargo === 'CN');
+    const evs = itens.filter(i => i.colaborador?.cargo === 'EV');
+    const lideranca = itens.filter(i => i.colaborador?.cargo === 'Lideranca');
+    return { cns, evs, lideranca };
   };
 
   if (isLoading) {
@@ -99,20 +121,32 @@ function HistoricoApuracoesContent() {
               Histórico de Apurações
             </h1>
             <p className="text-muted-foreground mt-1">
-              Consulte todas as apurações fechadas
+              Consulte todas as apurações fechadas e rascunhos
             </p>
           </div>
 
-          <Select value={selectedTipo} onValueChange={setSelectedTipo}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Filtrar por tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os tipos</SelectItem>
-              <SelectItem value="mensal">Mensal</SelectItem>
-              <SelectItem value="trimestral">Trimestral</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos status</SelectItem>
+                <SelectItem value="rascunho">Rascunhos</SelectItem>
+                <SelectItem value="finalizado">Finalizados</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={selectedTipo} onValueChange={setSelectedTipo}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os tipos</SelectItem>
+                <SelectItem value="mensal">Mensal</SelectItem>
+                <SelectItem value="trimestral">Trimestral</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* KPI Cards */}
@@ -183,17 +217,20 @@ function HistoricoApuracoesContent() {
               </p>
             </Card>
           ) : (
-              filteredApuracoes.map(apuracao => {
-                const apuracaoItens = expandedItens[apuracao.id] || [];
-                const isExpanded = expandedId === apuracao.id;
+            filteredApuracoes.map(apuracao => {
+              const apuracaoItens = expandedItens[apuracao.id] || [];
+              const isExpanded = expandedId === apuracao.id;
+              const { cns, evs, lideranca } = groupItemsByCargo(apuracaoItens);
+              const isTrimestral = apuracao.tipo === 'trimestral';
+              const isRascunho = apuracao.status === 'rascunho';
 
-                return (
-                  <Collapsible
+              return (
+                <Collapsible
                   key={apuracao.id}
                   open={isExpanded}
                   onOpenChange={() => handleExpand(apuracao.id)}
                 >
-                  <Card>
+                  <Card className={isRascunho ? 'border-amber-300 dark:border-amber-700' : ''}>
                     <CollapsibleTrigger asChild>
                       <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
                         <div className="flex items-center justify-between">
@@ -207,13 +244,22 @@ function HistoricoApuracoesContent() {
                               <Badge variant={apuracao.tipo === 'mensal' ? 'default' : 'secondary'}>
                                 {apuracao.tipo === 'mensal' ? 'Mensal' : 'Trimestral'}
                               </Badge>
+                              {isRascunho && (
+                                <Badge variant="outline" className="border-amber-500 text-amber-600 dark:text-amber-400">
+                                  <FileEdit className="w-3 h-3 mr-1" />
+                                  Rascunho
+                                </Badge>
+                              )}
                             </div>
                             <div>
                               <h3 className="font-semibold text-foreground">
                                 {apuracao.mes_referencia}
                               </h3>
                               <p className="text-sm text-muted-foreground">
-                                Fechado em: {apuracao.data_fechamento ? format(new Date(apuracao.data_fechamento), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '-'}
+                                {isRascunho 
+                                  ? `Última edição: ${apuracao.updated_at ? format(new Date(apuracao.updated_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '-'}`
+                                  : `Fechado em: ${apuracao.data_fechamento ? format(new Date(apuracao.data_fechamento), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '-'}`
+                                }
                               </p>
                             </div>
                           </div>
@@ -263,55 +309,194 @@ function HistoricoApuracoesContent() {
                     <CollapsibleContent>
                       <CardContent className="pt-0">
                         <div className="border-t pt-4">
-                          {/* Summary */}
+                          {/* Summary Cards */}
                           <div className="grid grid-cols-3 gap-4 mb-4">
-                            <div className="p-3 bg-muted/50 rounded-lg">
-                              <p className="text-xs text-muted-foreground">CNs</p>
+                            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Users className="w-3 h-3" /> CNs
+                              </p>
                               <p className="font-semibold">{formatCurrency(apuracao.total_cns || 0)}</p>
                             </div>
-                            <div className="p-3 bg-muted/50 rounded-lg">
-                              <p className="text-xs text-muted-foreground">EVs</p>
+                            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg">
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Briefcase className="w-3 h-3" /> EVs
+                              </p>
                               <p className="font-semibold">{formatCurrency(apuracao.total_evs || 0)}</p>
                             </div>
-                            <div className="p-3 bg-muted/50 rounded-lg">
-                              <p className="text-xs text-muted-foreground">Liderança</p>
+                            <div className="p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Crown className="w-3 h-3" /> Liderança
+                              </p>
                               <p className="font-semibold">{formatCurrency(apuracao.total_lideranca || 0)}</p>
                             </div>
                           </div>
 
-                          {/* Items Table */}
-                          {apuracaoItens.length > 0 && (
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-sm">
-                                <thead>
-                                  <tr className="border-b">
-                                    <th className="text-left py-2 px-3 font-medium text-muted-foreground">Colaborador ID</th>
-                                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Comissão Base</th>
-                                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Bônus</th>
-                                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Total</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
+                          {/* Hierarchical Tabs for Trimestral */}
+                          {isTrimestral && apuracaoItens.length > 0 ? (
+                            <Tabs value={activeDetailTab} onValueChange={setActiveDetailTab}>
+                              <TabsList className="grid w-full grid-cols-3 mb-4">
+                                <TabsTrigger value="cns" className="gap-1">
+                                  <Users className="w-3 h-3" />
+                                  CNs ({cns.length})
+                                </TabsTrigger>
+                                <TabsTrigger value="evs" className="gap-1">
+                                  <Briefcase className="w-3 h-3" />
+                                  EVs ({evs.length})
+                                </TabsTrigger>
+                                <TabsTrigger value="lideranca" className="gap-1">
+                                  <Crown className="w-3 h-3" />
+                                  Liderança ({lideranca.length})
+                                </TabsTrigger>
+                              </TabsList>
+
+                              <TabsContent value="cns">
+                                {cns.length === 0 ? (
+                                  <p className="text-center py-4 text-muted-foreground">Nenhum CN nesta apuração</p>
+                                ) : (
+                                  <div className="overflow-x-auto border rounded-lg">
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow>
+                                          <TableHead>Nome</TableHead>
+                                          <TableHead className="text-center">Nível</TableHead>
+                                          <TableHead className="text-right">Meta SAO</TableHead>
+                                          <TableHead className="text-right">Real SAO</TableHead>
+                                          <TableHead className="text-right">Score</TableHead>
+                                          <TableHead className="text-right">Comissão</TableHead>
+                                          <TableHead className="text-right">Bônus</TableHead>
+                                          <TableHead className="text-right">Total</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {cns.map(item => (
+                                          <TableRow key={item.id}>
+                                            <TableCell className="font-medium">{item.colaborador?.nome || '-'}</TableCell>
+                                            <TableCell className="text-center">
+                                              <Badge variant="outline">{item.colaborador?.nivel || '-'}</Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right">{item.sao_meta || '-'}</TableCell>
+                                            <TableCell className="text-right">{item.sao_realizado || '-'}</TableCell>
+                                            <TableCell className="text-right">
+                                              {item.score_final ? `${(item.score_final * 100).toFixed(1)}%` : '-'}
+                                            </TableCell>
+                                            <TableCell className="text-right">{formatCurrency(item.comissao_base || 0)}</TableCell>
+                                            <TableCell className="text-right">{formatCurrency(item.bonus_trimestral || 0)}</TableCell>
+                                            <TableCell className="text-right font-bold text-primary">
+                                              {formatCurrency(item.total_pagar)}
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                )}
+                              </TabsContent>
+
+                              <TabsContent value="evs">
+                                {evs.length === 0 ? (
+                                  <p className="text-center py-4 text-muted-foreground">Nenhum EV nesta apuração</p>
+                                ) : (
+                                  <div className="overflow-x-auto border rounded-lg">
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow>
+                                          <TableHead>Nome</TableHead>
+                                          <TableHead className="text-right">Comissão Safra</TableHead>
+                                          <TableHead className="text-center">Multiplicador</TableHead>
+                                          <TableHead className="text-right">Bônus EV</TableHead>
+                                          <TableHead className="text-right">Total</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {evs.map(item => (
+                                          <TableRow key={item.id}>
+                                            <TableCell className="font-medium">{item.colaborador?.nome || '-'}</TableCell>
+                                            <TableCell className="text-right">{formatCurrency(item.comissao_safra || 0)}</TableCell>
+                                            <TableCell className="text-center">
+                                              <Badge variant="secondary">{item.multiplicador_meta || 1}x</Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right">{formatCurrency(item.bonus_ev || 0)}</TableCell>
+                                            <TableCell className="text-right font-bold text-primary">
+                                              {formatCurrency(item.total_pagar)}
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                )}
+                              </TabsContent>
+
+                              <TabsContent value="lideranca">
+                                {lideranca.length === 0 ? (
+                                  <p className="text-center py-4 text-muted-foreground">Nenhum líder nesta apuração</p>
+                                ) : (
+                                  <div className="overflow-x-auto border rounded-lg">
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow>
+                                          <TableHead>Nome</TableHead>
+                                          <TableHead className="text-right">Salário Base</TableHead>
+                                          <TableHead className="text-right">Bônus Liderança</TableHead>
+                                          <TableHead className="text-right">Total</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {lideranca.map(item => (
+                                          <TableRow key={item.id}>
+                                            <TableCell className="font-medium">{item.colaborador?.nome || '-'}</TableCell>
+                                            <TableCell className="text-right">
+                                              {formatCurrency(item.colaborador?.salario_base || 0)}
+                                            </TableCell>
+                                            <TableCell className="text-right">{formatCurrency(item.bonus_lideranca || 0)}</TableCell>
+                                            <TableCell className="text-right font-bold text-primary">
+                                              {formatCurrency(item.total_pagar)}
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                )}
+                              </TabsContent>
+                            </Tabs>
+                          ) : apuracaoItens.length > 0 ? (
+                            // Simple table for Mensal
+                            <div className="overflow-x-auto border rounded-lg">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Colaborador</TableHead>
+                                    <TableHead className="text-center">Cargo</TableHead>
+                                    <TableHead className="text-right">Comissão Base</TableHead>
+                                    <TableHead className="text-right">Bônus</TableHead>
+                                    <TableHead className="text-right">Total</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
                                   {apuracaoItens.map(item => (
-                                    <tr key={item.id} className="border-b last:border-0">
-                                      <td className="py-2 px-3 font-medium">
-                                        {item.colaborador_id.substring(0, 8)}...
-                                      </td>
-                                      <td className="py-2 px-3 text-right">
+                                    <TableRow key={item.id}>
+                                      <TableCell className="font-medium">
+                                        {item.colaborador?.nome || item.colaborador_id.substring(0, 8) + '...'}
+                                      </TableCell>
+                                      <TableCell className="text-center">
+                                        <Badge variant="outline">{item.colaborador?.cargo || '-'}</Badge>
+                                      </TableCell>
+                                      <TableCell className="text-right">
                                         {formatCurrency(item.comissao_base || 0)}
-                                      </td>
-                                      <td className="py-2 px-3 text-right">
+                                      </TableCell>
+                                      <TableCell className="text-right">
                                         {formatCurrency((item.bonus_trimestral || 0) + (item.bonus_ev || 0) + (item.bonus_lideranca || 0))}
-                                      </td>
-                                      <td className="py-2 px-3 text-right font-semibold text-primary">
+                                      </TableCell>
+                                      <TableCell className="text-right font-bold text-primary">
                                         {formatCurrency(item.total_pagar)}
-                                      </td>
-                                    </tr>
+                                      </TableCell>
+                                    </TableRow>
                                   ))}
-                                </tbody>
-                              </table>
+                                </TableBody>
+                              </Table>
                             </div>
-                          )}
+                          ) : null}
                         </div>
                       </CardContent>
                     </CollapsibleContent>

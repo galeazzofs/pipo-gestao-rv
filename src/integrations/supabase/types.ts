@@ -138,11 +138,13 @@ export type Database = {
           data_fechamento: string | null
           id: string
           mes_referencia: string
+          status: string | null
           tipo: Database["public"]["Enums"]["tipo_apuracao"]
           total_cns: number | null
           total_evs: number | null
           total_geral: number | null
           total_lideranca: number | null
+          updated_at: string | null
         }
         Insert: {
           created_at?: string | null
@@ -150,11 +152,13 @@ export type Database = {
           data_fechamento?: string | null
           id?: string
           mes_referencia: string
+          status?: string | null
           tipo: Database["public"]["Enums"]["tipo_apuracao"]
           total_cns?: number | null
           total_evs?: number | null
           total_geral?: number | null
           total_lideranca?: number | null
+          updated_at?: string | null
         }
         Update: {
           created_at?: string | null
@@ -162,11 +166,13 @@ export type Database = {
           data_fechamento?: string | null
           id?: string
           mes_referencia?: string
+          status?: string | null
           tipo?: Database["public"]["Enums"]["tipo_apuracao"]
           total_cns?: number | null
           total_evs?: number | null
           total_geral?: number | null
           total_lideranca?: number | null
+          updated_at?: string | null
         }
         Relationships: []
       }

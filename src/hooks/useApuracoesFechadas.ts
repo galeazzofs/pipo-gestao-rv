@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export type TipoApuracao = 'mensal' | 'trimestral';
+export type StatusApuracao = 'rascunho' | 'finalizado';
 
 export interface ApuracaoFechada {
   id: string;
@@ -15,6 +16,8 @@ export interface ApuracaoFechada {
   total_lideranca: number;
   created_by: string | null;
   created_at: string;
+  status: StatusApuracao;
+  updated_at: string | null;
 }
 
 export interface ApuracaoFechadaItem {
@@ -110,13 +113,57 @@ export function useApuracoesFechadas() {
     fetchApuracoes();
   }, [fetchApuracoes]);
 
-  const saveApuracao = async (
+  // Load existing draft for a given tipo + mesReferencia
+  const loadDraft = async (tipo: TipoApuracao, mesReferencia: string): Promise<{ apuracao: ApuracaoFechada; itens: ApuracaoFechadaItem[] } | null> => {
+    try {
+      const { data: apuracaoData, error: apuracaoError } = await supabase
+        .from('apuracoes_fechadas')
+        .select('*')
+        .eq('tipo', tipo)
+        .eq('mes_referencia', mesReferencia)
+        .eq('status', 'rascunho')
+        .maybeSingle();
+
+      if (apuracaoError) throw apuracaoError;
+      if (!apuracaoData) return null;
+
+      const { data: itensData, error: itensError } = await supabase
+        .from('apuracoes_fechadas_itens')
+        .select(`
+          *,
+          colaborador:colaboradores(id, nome, cargo, nivel, salario_base)
+        `)
+        .eq('apuracao_id', apuracaoData.id);
+
+      if (itensError) throw itensError;
+
+      return {
+        apuracao: apuracaoData as ApuracaoFechada,
+        itens: (itensData || []) as ApuracaoFechadaItem[]
+      };
+    } catch (error: any) {
+      console.error('Erro ao carregar rascunho:', error);
+      return null;
+    }
+  };
+
+  // Save or update a draft
+  const saveDraft = async (
     tipo: TipoApuracao,
     mesReferencia: string,
     itens: ApuracaoItemInput[]
   ): Promise<string | null> => {
     try {
-      // Calcular totais
+      // Check if draft already exists
+      const { data: existingDraft } = await supabase
+        .from('apuracoes_fechadas')
+        .select('id')
+        .eq('tipo', tipo)
+        .eq('mes_referencia', mesReferencia)
+        .eq('status', 'rascunho')
+        .maybeSingle();
+
+      // Calculate totals
       const totalCNs = itens
         .filter(i => i.comissao_base !== undefined)
         .reduce((sum, i) => sum + (i.total_pagar || 0), 0);
@@ -131,7 +178,150 @@ export function useApuracoesFechadas() {
 
       const totalGeral = totalCNs + totalEVs + totalLideranca;
 
-      // Inserir cabeçalho
+      let apuracaoId: string;
+
+      if (existingDraft) {
+        // Update existing draft
+        apuracaoId = existingDraft.id;
+        
+        const { error: updateError } = await supabase
+          .from('apuracoes_fechadas')
+          .update({
+            total_geral: totalGeral,
+            total_cns: totalCNs,
+            total_evs: totalEVs,
+            total_lideranca: totalLideranca,
+          })
+          .eq('id', apuracaoId);
+
+        if (updateError) throw updateError;
+
+        // Delete old items and insert new ones
+        await supabase
+          .from('apuracoes_fechadas_itens')
+          .delete()
+          .eq('apuracao_id', apuracaoId);
+      } else {
+        // Create new draft
+        const { data: apuracaoData, error: apuracaoError } = await supabase
+          .from('apuracoes_fechadas')
+          .insert({
+            tipo,
+            mes_referencia: mesReferencia,
+            total_geral: totalGeral,
+            total_cns: totalCNs,
+            total_evs: totalEVs,
+            total_lideranca: totalLideranca,
+            status: 'rascunho',
+          })
+          .select()
+          .single();
+
+        if (apuracaoError) throw apuracaoError;
+        apuracaoId = apuracaoData.id;
+      }
+
+      // Insert items
+      if (itens.length > 0) {
+        const itensToInsert = itens.map(item => ({
+          apuracao_id: apuracaoId,
+          colaborador_id: item.colaborador_id,
+          sao_meta: item.sao_meta,
+          sao_realizado: item.sao_realizado,
+          vidas_meta: item.vidas_meta,
+          vidas_realizado: item.vidas_realizado,
+          pct_sao: item.pct_sao,
+          pct_vidas: item.pct_vidas,
+          score_final: item.score_final,
+          multiplicador: item.multiplicador,
+          comissao_base: item.comissao_base,
+          bonus_trimestral: item.bonus_trimestral || 0,
+          comissao_safra: item.comissao_safra || 0,
+          multiplicador_meta: item.multiplicador_meta || 1,
+          bonus_ev: item.bonus_ev || 0,
+          bonus_lideranca: item.bonus_lideranca || 0,
+          total_pagar: item.total_pagar,
+          observacoes: item.observacoes,
+        }));
+
+        const { error: itensError } = await supabase
+          .from('apuracoes_fechadas_itens')
+          .insert(itensToInsert);
+
+        if (itensError) throw itensError;
+      }
+
+      toast.success('Rascunho salvo com sucesso!');
+      await fetchApuracoes();
+      return apuracaoId;
+    } catch (error: any) {
+      console.error('Erro ao salvar rascunho:', error);
+      toast.error(error.message || 'Erro ao salvar rascunho');
+      return null;
+    }
+  };
+
+  // Finalize a draft (change status to 'finalizado')
+  const finalizarApuracao = async (id: string): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('apuracoes_fechadas')
+        .update({ 
+          status: 'finalizado',
+          data_fechamento: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast.success('Apuração finalizada com sucesso!');
+      await fetchApuracoes();
+      return true;
+    } catch (error: any) {
+      console.error('Erro ao finalizar apuração:', error);
+      toast.error(error.message || 'Erro ao finalizar apuração');
+      return false;
+    }
+  };
+
+  const saveApuracao = async (
+    tipo: TipoApuracao,
+    mesReferencia: string,
+    itens: ApuracaoItemInput[]
+  ): Promise<string | null> => {
+    try {
+      // Check if draft exists and delete it
+      const { data: existingDraft } = await supabase
+        .from('apuracoes_fechadas')
+        .select('id')
+        .eq('tipo', tipo)
+        .eq('mes_referencia', mesReferencia)
+        .eq('status', 'rascunho')
+        .maybeSingle();
+
+      if (existingDraft) {
+        await supabase
+          .from('apuracoes_fechadas')
+          .delete()
+          .eq('id', existingDraft.id);
+      }
+
+      // Calculate totals
+      const totalCNs = itens
+        .filter(i => i.comissao_base !== undefined)
+        .reduce((sum, i) => sum + (i.total_pagar || 0), 0);
+      
+      const totalEVs = itens
+        .filter(i => i.comissao_safra !== undefined)
+        .reduce((sum, i) => sum + (i.total_pagar || 0), 0);
+      
+      const totalLideranca = itens
+        .filter(i => i.bonus_lideranca !== undefined && i.bonus_lideranca > 0)
+        .reduce((sum, i) => sum + (i.total_pagar || 0), 0);
+
+      const totalGeral = totalCNs + totalEVs + totalLideranca;
+
+      // Insert finalized apuracao
       const { data: apuracaoData, error: apuracaoError } = await supabase
         .from('apuracoes_fechadas')
         .insert({
@@ -141,13 +331,15 @@ export function useApuracoesFechadas() {
           total_cns: totalCNs,
           total_evs: totalEVs,
           total_lideranca: totalLideranca,
+          status: 'finalizado',
+          data_fechamento: new Date().toISOString(),
         })
         .select()
         .single();
 
       if (apuracaoError) throw apuracaoError;
 
-      // Inserir itens
+      // Insert items
       const itensToInsert = itens.map(item => ({
         apuracao_id: apuracaoData.id,
         colaborador_id: item.colaborador_id,
@@ -175,7 +367,7 @@ export function useApuracoesFechadas() {
 
       if (itensError) throw itensError;
 
-      toast.success(`Apuração ${tipo} salva com sucesso!`);
+      toast.success(`Apuração ${tipo} finalizada com sucesso!`);
       await fetchApuracoes();
       return apuracaoData.id;
     } catch (error: any) {
@@ -224,7 +416,7 @@ export function useApuracoesFechadas() {
     }
   };
 
-  // Filtros
+  // Filters
   const getMensais = useCallback(() => {
     return apuracoes.filter(a => a.tipo === 'mensal');
   }, [apuracoes]);
@@ -233,10 +425,18 @@ export function useApuracoesFechadas() {
     return apuracoes.filter(a => a.tipo === 'trimestral');
   }, [apuracoes]);
 
-  // Para usuários verem seus próprios resultados
+  const getRascunhos = useCallback(() => {
+    return apuracoes.filter(a => a.status === 'rascunho');
+  }, [apuracoes]);
+
+  const getFinalizados = useCallback(() => {
+    return apuracoes.filter(a => a.status === 'finalizado');
+  }, [apuracoes]);
+
+  // For users to see their own results
   const getMeusResultados = async (email: string): Promise<ApuracaoFechadaItem[]> => {
     try {
-      // Primeiro buscar o colaborador pelo email
+      // First find the collaborator by email
       const { data: colaboradorData, error: colaboradorError } = await supabase
         .from('colaboradores')
         .select('id')
@@ -247,12 +447,12 @@ export function useApuracoesFechadas() {
         return [];
       }
 
-      // Buscar itens de apuração deste colaborador
+      // Fetch apuracao items for this collaborator
       const { data, error } = await supabase
         .from('apuracoes_fechadas_itens')
         .select(`
           *,
-          apuracao:apuracoes_fechadas(id, tipo, mes_referencia, data_fechamento)
+          apuracao:apuracoes_fechadas(id, tipo, mes_referencia, data_fechamento, status)
         `)
         .eq('colaborador_id', colaboradorData.id)
         .order('created_at', { ascending: false });
@@ -270,10 +470,15 @@ export function useApuracoesFechadas() {
     apuracoes,
     isLoading,
     saveApuracao,
+    saveDraft,
+    loadDraft,
+    finalizarApuracao,
     getApuracaoItens,
     deleteApuracao,
     getMensais,
     getTrimestrais,
+    getRascunhos,
+    getFinalizados,
     getMeusResultados,
     refetch: fetchApuracoes,
   };

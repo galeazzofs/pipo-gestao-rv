@@ -44,6 +44,13 @@ export interface ApuracaoFechadaItem {
   
   // Liderança
   bonus_lideranca: number | null;
+  meta_mrr_lider: number | null;
+  meta_sql_lider: number | null;
+  realizado_mrr_lider: number | null;
+  realizado_sql_lider: number | null;
+  pct_mrr_lider: number | null;
+  pct_sql_lider: number | null;
+  multiplicador_lider: number | null;
   
   total_pagar: number;
   observacoes: string | null;
@@ -56,6 +63,7 @@ export interface ApuracaoFechadaItem {
     cargo: string;
     nivel: string | null;
     salario_base: number;
+    lider_id: string | null;
   };
 }
 
@@ -81,6 +89,13 @@ export interface ApuracaoItemInput {
   
   // Liderança
   bonus_lideranca?: number;
+  meta_mrr_lider?: number;
+  meta_sql_lider?: number;
+  realizado_mrr_lider?: number;
+  realizado_sql_lider?: number;
+  pct_mrr_lider?: number;
+  pct_sql_lider?: number;
+  multiplicador_lider?: number;
   
   total_pagar: number;
   observacoes?: string;
@@ -131,7 +146,7 @@ export function useApuracoesFechadas() {
         .from('apuracoes_fechadas_itens')
         .select(`
           *,
-          colaborador:colaboradores(id, nome, cargo, nivel, salario_base)
+          colaborador:colaboradores(id, nome, cargo, nivel, salario_base, lider_id)
         `)
         .eq('apuracao_id', apuracaoData.id);
 
@@ -240,6 +255,13 @@ export function useApuracoesFechadas() {
           multiplicador_meta: item.multiplicador_meta || 1,
           bonus_ev: item.bonus_ev || 0,
           bonus_lideranca: item.bonus_lideranca || 0,
+          meta_mrr_lider: item.meta_mrr_lider || 0,
+          meta_sql_lider: item.meta_sql_lider || 0,
+          realizado_mrr_lider: item.realizado_mrr_lider || 0,
+          realizado_sql_lider: item.realizado_sql_lider || 0,
+          pct_mrr_lider: item.pct_mrr_lider || 0,
+          pct_sql_lider: item.pct_sql_lider || 0,
+          multiplicador_lider: item.multiplicador_lider || 0,
           total_pagar: item.total_pagar,
           observacoes: item.observacoes,
         }));
@@ -357,6 +379,13 @@ export function useApuracoesFechadas() {
         multiplicador_meta: item.multiplicador_meta || 1,
         bonus_ev: item.bonus_ev || 0,
         bonus_lideranca: item.bonus_lideranca || 0,
+        meta_mrr_lider: item.meta_mrr_lider || 0,
+        meta_sql_lider: item.meta_sql_lider || 0,
+        realizado_mrr_lider: item.realizado_mrr_lider || 0,
+        realizado_sql_lider: item.realizado_sql_lider || 0,
+        pct_mrr_lider: item.pct_mrr_lider || 0,
+        pct_sql_lider: item.pct_sql_lider || 0,
+        multiplicador_lider: item.multiplicador_lider || 0,
         total_pagar: item.total_pagar,
         observacoes: item.observacoes,
       }));
@@ -383,7 +412,7 @@ export function useApuracoesFechadas() {
         .from('apuracoes_fechadas_itens')
         .select(`
           *,
-          colaborador:colaboradores(id, nome, cargo, nivel, salario_base)
+          colaborador:colaboradores(id, nome, cargo, nivel, salario_base, lider_id)
         `)
         .eq('apuracao_id', apuracaoId);
 

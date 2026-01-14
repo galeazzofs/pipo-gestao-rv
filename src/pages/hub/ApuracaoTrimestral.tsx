@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Navbar } from '@/components/Navbar';
 import { AdminRoute } from '@/components/AdminRoute';
-import { useColaboradores } from '@/hooks/useColaboradores';
+import { useColaboradores, Colaborador } from '@/hooks/useColaboradores';
 import { useApuracoesFechadas, ApuracaoItemInput, ApuracaoFechadaItem } from '@/hooks/useApuracoesFechadas';
 import { useContracts } from '@/hooks/useContracts';
 import { calcularComissaoCN, CNLevel, CN_TARGETS } from '@/lib/cnCalculations';
@@ -11,6 +11,7 @@ import { processCommissions, groupByEV, calculateTotals } from '@/components/ev/
 import { ExcelRow, formatCurrency as formatCurrencyEV, ProcessedResult } from '@/lib/evCalculations';
 import { ResultsDashboard } from '@/components/ev/ResultsDashboard';
 import { ResultsTable } from '@/components/ev/ResultsTable';
+import { getMultiplicadorLideranca, calcularMetaMRRLider, getMRRFaixa, getSQLFaixa, getMultiplicadorColor, MATRIZ_LIDERANCA } from '@/lib/leadershipCalculations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -63,6 +64,7 @@ import {
   FileCheck,
   Clock,
   AlertTriangle,
+  HelpCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ExcelDropzone } from '@/components/ev/ExcelDropzone';
@@ -121,12 +123,25 @@ interface EVRow {
 }
 
 interface LiderRow {
-  bonus: string;
+  // Automático (calculado baseado nos EVs do time)
+  metaMRRCalculada: number;
+  evsDoTime: string[];
+  
+  // Inputs manuais
+  metaSQL: string;
+  realizadoMRR: string;
+  realizadoSQL: string;
+  
+  // Calculados
+  pctMRR: number;
+  pctSQL: number;
+  multiplicador: number;
+  bonus: number;
   total: number;
 }
 
 export default function ApuracaoTrimestral() {
-  const { getCNs, getEVs, getLideres, isLoading: loadingColaboradores } = useColaboradores();
+  const { getCNs, getEVs, getLideres, colaboradores, isLoading: loadingColaboradores } = useColaboradores();
   const { saveDraft, loadDraft, saveApuracao, finalizarApuracao } = useApuracoesFechadas();
   const { contracts, isLoading: loadingContracts } = useContracts();
   
@@ -171,6 +186,26 @@ export default function ApuracaoTrimestral() {
     return `${(value * 100).toFixed(1)}%`;
   };
 
+  // Helper: Get EVs subordinated to a leader
+  const getEVsDoLider = useCallback((liderId: string): Colaborador[] => {
+    return colaboradores.filter(c => c.cargo === 'EV' && c.lider_id === liderId && c.ativo);
+  }, [colaboradores]);
+
+  // Calculate Meta MRR for a leader based on their EVs
+  const calcularMetaMRRParaLider = useCallback((liderId: string): { metaMRR: number; evIds: string[] } => {
+    const evsDoTime = getEVsDoLider(liderId);
+    const evIds = evsDoTime.map(ev => ev.id);
+    
+    // Get the MRR goals from evRows
+    const metasMRR = evsDoTime.map(ev => {
+      const evRow = evRows[ev.id];
+      return parseFloat(evRow?.metaMRR || '0') || 0;
+    });
+    
+    const metaMRR = calcularMetaMRRLider(metasMRR);
+    return { metaMRR, evIds };
+  }, [getEVsDoLider, evRows]);
+
   // Load draft when quarter/year changes
   const loadExistingDraft = useCallback(async () => {
     setIsLoadingDraft(true);
@@ -212,7 +247,15 @@ export default function ApuracaoTrimestral() {
           };
         } else if (item.colaborador?.cargo === 'Lideranca') {
           newLiderRows[item.colaborador_id] = {
-            bonus: item.bonus_lideranca?.toString() || '',
+            metaMRRCalculada: item.meta_mrr_lider || 0,
+            evsDoTime: [],
+            metaSQL: item.meta_sql_lider?.toString() || '',
+            realizadoMRR: item.realizado_mrr_lider?.toString() || '',
+            realizadoSQL: item.realizado_sql_lider?.toString() || '',
+            pctMRR: item.pct_mrr_lider || 0,
+            pctSQL: item.pct_sql_lider || 0,
+            multiplicador: item.multiplicador_lider || 0,
+            bonus: item.bonus_lideranca || 0,
             total: item.total_pagar,
           };
         }
@@ -242,6 +285,54 @@ export default function ApuracaoTrimestral() {
       loadExistingDraft();
     }
   }, [trimestre, ano, loadingColaboradores]);
+
+  // Recalculate leader's Meta MRR whenever EV rows change
+  useEffect(() => {
+    if (lideres.length === 0) return;
+    
+    setLiderRows(prev => {
+      const updated = { ...prev };
+      lideres.forEach(lider => {
+        const { metaMRR, evIds } = calcularMetaMRRParaLider(lider.id);
+        const current = updated[lider.id] || {
+          metaMRRCalculada: 0,
+          evsDoTime: [],
+          metaSQL: '',
+          realizadoMRR: '',
+          realizadoSQL: '',
+          pctMRR: 0,
+          pctSQL: 0,
+          multiplicador: 0,
+          bonus: 0,
+          total: 0
+        };
+        
+        // Only update if Meta MRR changed
+        if (current.metaMRRCalculada !== metaMRR || JSON.stringify(current.evsDoTime) !== JSON.stringify(evIds)) {
+          const realizadoMRR = parseFloat(current.realizadoMRR) || 0;
+          const metaSQL = parseFloat(current.metaSQL) || 0;
+          const realizadoSQL = parseFloat(current.realizadoSQL) || 0;
+          
+          const pctMRR = metaMRR > 0 ? (realizadoMRR / metaMRR) * 100 : 0;
+          const pctSQL = metaSQL > 0 ? (realizadoSQL / metaSQL) * 100 : 0;
+          const multiplicador = getMultiplicadorLideranca(pctMRR, pctSQL);
+          const bonus = (lider.salario_base || 0) * multiplicador;
+          
+          updated[lider.id] = {
+            ...current,
+            metaMRRCalculada: metaMRR,
+            evsDoTime: evIds,
+            pctMRR,
+            pctSQL,
+            multiplicador,
+            bonus,
+            total: bonus
+          };
+        }
+      });
+      return updated;
+    });
+  }, [evRows, lideres, calcularMetaMRRParaLider]);
 
   // Handlers for CNs
   const updateCNRow = (id: string, field: keyof CNRow, value: string) => {
@@ -412,14 +503,38 @@ export default function ApuracaoTrimestral() {
   }, [trimestre, ano]);
 
   // Handler for Leadership
-  const updateLiderRow = (id: string, bonus: string) => {
-    setLiderRows(prev => ({
-      ...prev,
-      [id]: {
-        bonus,
-        total: parseFloat(bonus) || 0
-      }
-    }));
+  const updateLiderRow = (id: string, field: 'metaSQL' | 'realizadoMRR' | 'realizadoSQL', value: string) => {
+    setLiderRows(prev => {
+      const lider = lideres.find(l => l.id === id);
+      const { metaMRR: metaMRRCalculada, evIds } = calcularMetaMRRParaLider(id);
+      
+      const current = prev[id] || {
+        metaMRRCalculada,
+        evsDoTime: evIds,
+        metaSQL: '',
+        realizadoMRR: '',
+        realizadoSQL: '',
+        pctMRR: 0,
+        pctSQL: 0,
+        multiplicador: 0,
+        bonus: 0,
+        total: 0
+      };
+      
+      const updated = { ...current, [field]: value, metaMRRCalculada, evsDoTime: evIds };
+      
+      const realizadoMRR = parseFloat(updated.realizadoMRR) || 0;
+      const metaSQL = parseFloat(updated.metaSQL) || 0;
+      const realizadoSQL = parseFloat(updated.realizadoSQL) || 0;
+      
+      updated.pctMRR = metaMRRCalculada > 0 ? (realizadoMRR / metaMRRCalculada) * 100 : 0;
+      updated.pctSQL = metaSQL > 0 ? (realizadoSQL / metaSQL) * 100 : 0;
+      updated.multiplicador = getMultiplicadorLideranca(updated.pctMRR, updated.pctSQL);
+      updated.bonus = (lider?.salario_base || 0) * updated.multiplicador;
+      updated.total = updated.bonus;
+      
+      return { ...prev, [id]: updated };
+    });
   };
 
   // Totals
@@ -476,10 +591,17 @@ export default function ApuracaoTrimestral() {
 
     lideres.forEach(lider => {
       const row = liderRows[lider.id];
-      if (row && row.total > 0) {
+      if (row && (row.total > 0 || row.metaSQL || row.realizadoMRR || row.realizadoSQL)) {
         itens.push({
           colaborador_id: lider.id,
-          bonus_lideranca: row.total,
+          bonus_lideranca: row.bonus,
+          meta_mrr_lider: row.metaMRRCalculada,
+          meta_sql_lider: parseFloat(row.metaSQL) || 0,
+          realizado_mrr_lider: parseFloat(row.realizadoMRR) || 0,
+          realizado_sql_lider: parseFloat(row.realizadoSQL) || 0,
+          pct_mrr_lider: row.pctMRR,
+          pct_sql_lider: row.pctSQL,
+          multiplicador_lider: row.multiplicador,
           total_pagar: row.total,
         });
       }
@@ -497,6 +619,16 @@ export default function ApuracaoTrimestral() {
     if (evs.length > 0 && !hasProcessedExcel && !hasEVsWithComissao) {
       errors.push('Processe o Excel de comissões dos EVs antes de finalizar');
     }
+
+    // Validate leadership: all fields must be filled if there's any data
+    lideres.forEach(lider => {
+      const row = liderRows[lider.id];
+      if (row && row.metaMRRCalculada > 0) {
+        if (!row.metaSQL || !row.realizadoMRR || !row.realizadoSQL) {
+          errors.push(`Preencha todos os campos de ${lider.nome}`);
+        }
+      }
+    });
 
     if (totalGeral === 0) {
       errors.push('Preencha pelo menos uma seção antes de finalizar');
@@ -977,7 +1109,7 @@ export default function ApuracaoTrimestral() {
                       <Crown className="w-5 h-5 text-purple-600" />
                     </div>
                     <div className="flex-1 text-left">
-                      <h3 className="font-semibold">Seção 3: Liderança</h3>
+                      <h3 className="font-semibold">Seção 3: Liderança (Matriz Mista MRR × SQL)</h3>
                       <p className="text-sm text-muted-foreground">
                         {lideres.length} líderes • Subtotal: {formatCurrency(totalLideranca)}
                       </p>
@@ -990,13 +1122,74 @@ export default function ApuracaoTrimestral() {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="px-4 pb-4">
+                  {/* Leadership Matrix Explanation */}
                   <div className="p-4 mb-4 flex items-start gap-3 bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900 rounded-lg">
-                    <Info className="w-5 h-5 text-purple-600 mt-0.5" />
-                    <div className="text-sm">
-                      <p className="font-medium text-purple-800 dark:text-purple-300">Bônus Liderança</p>
-                      <p className="text-purple-700 dark:text-purple-400">
-                        Valor manual. Regra de cálculo automático em definição.
-                      </p>
+                    <Info className="w-5 h-5 text-purple-600 mt-0.5 shrink-0" />
+                    <div className="text-sm space-y-2">
+                      <p className="font-medium text-purple-800 dark:text-purple-300">Matriz de Bônus de Liderança</p>
+                      <div className="text-purple-700 dark:text-purple-400 space-y-1">
+                        <p><strong>Meta MRR (Automática):</strong> 90% da soma das metas MRR dos EVs do time</p>
+                        <p><strong>Meta SQL (Manual):</strong> Digitada pelo admin</p>
+                        <p><strong>Bônus:</strong> Salário Base × Multiplicador (cruzando % MRR × % SQL na matriz)</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Matrix Reference Table */}
+                  <div className="mb-6 overflow-x-auto">
+                    <div className="text-sm font-medium mb-2 flex items-center gap-2 text-muted-foreground">
+                      <HelpCircle className="w-4 h-4" />
+                      Tabela de Multiplicadores
+                    </div>
+                    <div className="border rounded-lg overflow-hidden text-xs">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="text-center font-bold">MRR ↓ / SQL →</TableHead>
+                            <TableHead className="text-center">&lt; 80%</TableHead>
+                            <TableHead className="text-center">80% - 94.9%</TableHead>
+                            <TableHead className="text-center">95% - 109.9%</TableHead>
+                            <TableHead className="text-center">≥ 110%</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          <TableRow>
+                            <TableCell className="font-medium bg-muted/30">&lt; 60%</TableCell>
+                            <TableCell className="text-center text-destructive font-bold">0x</TableCell>
+                            <TableCell className="text-center text-destructive font-bold">0x</TableCell>
+                            <TableCell className="text-center text-destructive font-bold">0x</TableCell>
+                            <TableCell className="text-center text-destructive font-bold">0x</TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium bg-muted/30">60% - 79.9%</TableCell>
+                            <TableCell className="text-center">0.5x</TableCell>
+                            <TableCell className="text-center">0.75x</TableCell>
+                            <TableCell className="text-center">1.0x</TableCell>
+                            <TableCell className="text-center">1.25x</TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium bg-muted/30">80% - 94.9%</TableCell>
+                            <TableCell className="text-center">1.0x</TableCell>
+                            <TableCell className="text-center">1.5x</TableCell>
+                            <TableCell className="text-center">2.0x</TableCell>
+                            <TableCell className="text-center">2.25x</TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium bg-muted/30">95% - 109.9%</TableCell>
+                            <TableCell className="text-center">1.5x</TableCell>
+                            <TableCell className="text-center">2.0x</TableCell>
+                            <TableCell className="text-center text-green-600 dark:text-green-400 font-bold">3.0x</TableCell>
+                            <TableCell className="text-center text-green-600 dark:text-green-400 font-bold">3.25x</TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium bg-muted/30">≥ 110%</TableCell>
+                            <TableCell className="text-center">2.0x</TableCell>
+                            <TableCell className="text-center">2.75x</TableCell>
+                            <TableCell className="text-center text-emerald-600 dark:text-emerald-400 font-bold">3.5x</TableCell>
+                            <TableCell className="text-center text-emerald-600 dark:text-emerald-400 font-bold">4.0x</TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
                     </div>
                   </div>
 
@@ -1011,32 +1204,155 @@ export default function ApuracaoTrimestral() {
                           <TableRow>
                             <TableHead>Líder</TableHead>
                             <TableHead className="text-right">Salário Base</TableHead>
-                            <TableHead className="text-right w-40">Bônus Liderança</TableHead>
-                            <TableHead className="text-right">TOTAL</TableHead>
+                            <TableHead className="text-right">
+                              <Tooltip>
+                                <TooltipTrigger className="flex items-center gap-1 justify-end w-full">
+                                  Meta MRR
+                                  <Info className="w-3 h-3" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>90% da soma das metas MRR dos EVs do time</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TableHead>
+                            <TableHead className="text-right w-28">Meta SQL</TableHead>
+                            <TableHead className="text-right w-28">Real MRR</TableHead>
+                            <TableHead className="text-right w-28">Real SQL</TableHead>
+                            <TableHead className="text-center">% MRR</TableHead>
+                            <TableHead className="text-center">% SQL</TableHead>
+                            <TableHead className="text-center">Mult.</TableHead>
+                            <TableHead className="text-right">BÔNUS</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {lideres.map((lider) => {
-                            const row = liderRows[lider.id] || { bonus: '', total: 0 };
+                            const { metaMRR: metaMRRCalculada, evIds } = calcularMetaMRRParaLider(lider.id);
+                            const evsDoTime = getEVsDoLider(lider.id);
+                            const row = liderRows[lider.id] || {
+                              metaMRRCalculada,
+                              evsDoTime: evIds,
+                              metaSQL: '',
+                              realizadoMRR: '',
+                              realizadoSQL: '',
+                              pctMRR: 0,
+                              pctSQL: 0,
+                              multiplicador: 0,
+                              bonus: 0,
+                              total: 0
+                            };
+                            
+                            const hasNoEvs = evsDoTime.length === 0;
 
                             return (
-                              <TableRow key={lider.id}>
-                                <TableCell className="font-medium">{lider.nome}</TableCell>
+                              <TableRow key={lider.id} className={hasNoEvs ? 'opacity-60' : ''}>
+                                <TableCell className="font-medium">
+                                  <div className="flex flex-col">
+                                    <span>{lider.nome}</span>
+                                    {evsDoTime.length > 0 ? (
+                                      <span className="text-xs text-muted-foreground">
+                                        {evsDoTime.length} EV{evsDoTime.length > 1 ? 's' : ''}: {evsDoTime.map(e => e.nome.split(' ')[0]).join(', ')}
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                        <AlertTriangle className="w-3 h-3" />
+                                        Sem EVs vinculados
+                                      </span>
+                                    )}
+                                  </div>
+                                </TableCell>
                                 <TableCell className="text-right text-muted-foreground">
                                   {formatCurrency(lider.salario_base)}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex flex-col items-end">
+                                    <span className="font-medium">{formatCurrency(metaMRRCalculada)}</span>
+                                    {evsDoTime.length > 0 && (
+                                      <span className="text-xs text-muted-foreground">
+                                        90% de {formatCurrency(metaMRRCalculada / 0.9)}
+                                      </span>
+                                    )}
+                                  </div>
                                 </TableCell>
                                 <TableCell>
                                   <Input
                                     type="number"
                                     min="0"
-                                    value={row.bonus || ''}
-                                    onChange={(e) => updateLiderRow(lider.id, e.target.value)}
-                                    className="w-36"
-                                    placeholder="R$ 0"
+                                    value={row.metaSQL}
+                                    onChange={(e) => updateLiderRow(lider.id, 'metaSQL', e.target.value)}
+                                    className="w-24 text-right"
+                                    placeholder="0"
+                                    disabled={hasNoEvs}
                                   />
                                 </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    value={row.realizadoMRR}
+                                    onChange={(e) => updateLiderRow(lider.id, 'realizadoMRR', e.target.value)}
+                                    className="w-24 text-right"
+                                    placeholder="R$ 0"
+                                    disabled={hasNoEvs}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    value={row.realizadoSQL}
+                                    onChange={(e) => updateLiderRow(lider.id, 'realizadoSQL', e.target.value)}
+                                    className="w-24 text-right"
+                                    placeholder="0"
+                                    disabled={hasNoEvs}
+                                  />
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <span className={cn(
+                                    "text-sm font-semibold",
+                                    row.pctMRR >= 110 ? "text-emerald-600 dark:text-emerald-400" :
+                                    row.pctMRR >= 95 ? "text-green-600 dark:text-green-400" :
+                                    row.pctMRR >= 80 ? "text-amber-600 dark:text-amber-400" :
+                                    row.pctMRR >= 60 ? "text-orange-600 dark:text-orange-400" :
+                                    row.pctMRR > 0 ? "text-red-600 dark:text-red-400" :
+                                    "text-muted-foreground"
+                                  )}>
+                                    {row.pctMRR > 0 ? `${row.pctMRR.toFixed(1)}%` : '-'}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <span className={cn(
+                                    "text-sm font-semibold",
+                                    row.pctSQL >= 110 ? "text-emerald-600 dark:text-emerald-400" :
+                                    row.pctSQL >= 95 ? "text-green-600 dark:text-green-400" :
+                                    row.pctSQL >= 80 ? "text-amber-600 dark:text-amber-400" :
+                                    row.pctSQL > 0 ? "text-red-600 dark:text-red-400" :
+                                    "text-muted-foreground"
+                                  )}>
+                                    {row.pctSQL > 0 ? `${row.pctSQL.toFixed(1)}%` : '-'}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <Badge 
+                                    variant={
+                                      row.multiplicador >= 3 ? "default" :
+                                      row.multiplicador >= 2 ? "secondary" :
+                                      row.multiplicador >= 1 ? "outline" :
+                                      row.multiplicador > 0 ? "outline" :
+                                      "destructive"
+                                    }
+                                    className={cn(
+                                      row.multiplicador >= 3.5 && "bg-emerald-500 hover:bg-emerald-600",
+                                      row.multiplicador >= 3 && row.multiplicador < 3.5 && "bg-green-500 hover:bg-green-600",
+                                      row.multiplicador >= 2 && row.multiplicador < 3 && "bg-green-500/20 text-green-700 dark:text-green-300",
+                                      row.multiplicador >= 1 && row.multiplicador < 2 && "border-amber-500 text-amber-700 dark:text-amber-300",
+                                      row.multiplicador > 0 && row.multiplicador < 1 && "border-orange-500 text-orange-700 dark:text-orange-300"
+                                    )}
+                                  >
+                                    {row.multiplicador}x
+                                  </Badge>
+                                </TableCell>
                                 <TableCell className="text-right font-bold text-purple-600 dark:text-purple-400">
-                                  {formatCurrency(row.total)}
+                                  {formatCurrency(row.bonus)}
                                 </TableCell>
                               </TableRow>
                             );
@@ -1127,19 +1443,11 @@ export default function ApuracaoTrimestral() {
                             <span>Liderança:</span>
                             <span className="font-medium">{formatCurrency(totalLideranca)}</span>
                           </div>
-                          <div className="border-t pt-2 flex justify-between font-bold">
-                            <span>Total Geral:</span>
+                          <div className="flex justify-between border-t pt-2 font-bold">
+                            <span>TOTAL:</span>
                             <span className="text-primary">{formatCurrency(totalGeral)}</span>
                           </div>
                         </div>
-                        {evs.length > 0 && !hasProcessedExcel && (
-                          <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg flex items-start gap-2">
-                            <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5" />
-                            <span className="text-sm text-amber-700 dark:text-amber-400">
-                              O Excel de comissões dos EVs não foi processado.
-                            </span>
-                          </div>
-                        )}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

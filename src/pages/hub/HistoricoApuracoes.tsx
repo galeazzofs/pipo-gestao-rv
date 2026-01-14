@@ -437,8 +437,14 @@ function HistoricoApuracoesContent() {
                                         <TableRow>
                                           <TableHead>Nome</TableHead>
                                           <TableHead className="text-right">Salário Base</TableHead>
-                                          <TableHead className="text-right">Bônus Liderança</TableHead>
-                                          <TableHead className="text-right">Total</TableHead>
+                                          <TableHead className="text-right">Meta MRR</TableHead>
+                                          <TableHead className="text-right">Meta SQL</TableHead>
+                                          <TableHead className="text-right">Real MRR</TableHead>
+                                          <TableHead className="text-right">Real SQL</TableHead>
+                                          <TableHead className="text-center">% MRR</TableHead>
+                                          <TableHead className="text-center">% SQL</TableHead>
+                                          <TableHead className="text-center">Mult.</TableHead>
+                                          <TableHead className="text-right">Bônus</TableHead>
                                         </TableRow>
                                       </TableHeader>
                                       <TableBody>
@@ -448,9 +454,29 @@ function HistoricoApuracoesContent() {
                                             <TableCell className="text-right">
                                               {formatCurrency(item.colaborador?.salario_base || 0)}
                                             </TableCell>
-                                            <TableCell className="text-right">{formatCurrency(item.bonus_lideranca || 0)}</TableCell>
+                                            <TableCell className="text-right">
+                                              {formatCurrency((item as any).meta_mrr_lider || 0)}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                              {(item as any).meta_sql_lider || '-'}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                              {formatCurrency((item as any).realizado_mrr_lider || 0)}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                              {(item as any).realizado_sql_lider || '-'}
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                              {(item as any).pct_mrr_lider ? `${((item as any).pct_mrr_lider).toFixed(1)}%` : '-'}
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                              {(item as any).pct_sql_lider ? `${((item as any).pct_sql_lider).toFixed(1)}%` : '-'}
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                              <Badge variant="secondary">{(item as any).multiplicador_lider || 0}x</Badge>
+                                            </TableCell>
                                             <TableCell className="text-right font-bold text-primary">
-                                              {formatCurrency(item.total_pagar)}
+                                              {formatCurrency(item.bonus_lideranca || 0)}
                                             </TableCell>
                                           </TableRow>
                                         ))}

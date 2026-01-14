@@ -187,11 +187,18 @@ export type Database = {
           comissao_safra: number | null
           created_at: string | null
           id: string
+          meta_mrr_lider: number | null
+          meta_sql_lider: number | null
           multiplicador: number | null
+          multiplicador_lider: number | null
           multiplicador_meta: number | null
           observacoes: string | null
+          pct_mrr_lider: number | null
           pct_sao: number | null
+          pct_sql_lider: number | null
           pct_vidas: number | null
+          realizado_mrr_lider: number | null
+          realizado_sql_lider: number | null
           sao_meta: number | null
           sao_realizado: number | null
           score_final: number | null
@@ -209,11 +216,18 @@ export type Database = {
           comissao_safra?: number | null
           created_at?: string | null
           id?: string
+          meta_mrr_lider?: number | null
+          meta_sql_lider?: number | null
           multiplicador?: number | null
+          multiplicador_lider?: number | null
           multiplicador_meta?: number | null
           observacoes?: string | null
+          pct_mrr_lider?: number | null
           pct_sao?: number | null
+          pct_sql_lider?: number | null
           pct_vidas?: number | null
+          realizado_mrr_lider?: number | null
+          realizado_sql_lider?: number | null
           sao_meta?: number | null
           sao_realizado?: number | null
           score_final?: number | null
@@ -231,11 +245,18 @@ export type Database = {
           comissao_safra?: number | null
           created_at?: string | null
           id?: string
+          meta_mrr_lider?: number | null
+          meta_sql_lider?: number | null
           multiplicador?: number | null
+          multiplicador_lider?: number | null
           multiplicador_meta?: number | null
           observacoes?: string | null
+          pct_mrr_lider?: number | null
           pct_sao?: number | null
+          pct_sql_lider?: number | null
           pct_vidas?: number | null
+          realizado_mrr_lider?: number | null
+          realizado_sql_lider?: number | null
           sao_meta?: number | null
           sao_realizado?: number | null
           score_final?: number | null

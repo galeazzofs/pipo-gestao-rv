@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Navbar } from '@/components/Navbar';
@@ -141,20 +142,27 @@ interface LiderRow {
 }
 
 export default function ApuracaoTrimestral() {
+  const [searchParams] = useSearchParams();
   const { getCNs, getEVs, getLideres, colaboradores, isLoading: loadingColaboradores } = useColaboradores();
   const { saveDraft, loadDraft, saveApuracao, finalizarApuracao } = useApuracoesFechadas();
   const { contracts, isLoading: loadingContracts } = useContracts();
   
   const currentDate = new Date();
   const currentQuarter = Math.ceil((currentDate.getMonth() + 1) / 3);
-  const [trimestre, setTrimestre] = useState(`Q${currentQuarter}`);
-  const [ano, setAno] = useState(String(currentDate.getFullYear()));
+  
+  // Read query params for draft resumption
+  const queryQuarter = searchParams.get('q');
+  const queryYear = searchParams.get('year');
+  
+  const [trimestre, setTrimestre] = useState(queryQuarter || `Q${currentQuarter}`);
+  const [ano, setAno] = useState(queryYear || String(currentDate.getFullYear()));
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [expandedSections, setExpandedSections] = useState<string[]>(['cns', 'evs', 'lideranca']);
+  const [hasInitializedMetas, setHasInitializedMetas] = useState(false);
   
   const cns = getCNs();
   const evs = getEVs();
@@ -285,6 +293,55 @@ export default function ApuracaoTrimestral() {
       loadExistingDraft();
     }
   }, [trimestre, ano, loadingColaboradores]);
+
+  // Pre-fill goals from colaboradores when no draft loaded
+  useEffect(() => {
+    if (loadingColaboradores || hasInitializedMetas || draftId) return;
+    
+    // Initialize CN rows with stored goals
+    const initialCnRows: Record<string, CNRow> = {};
+    cns.forEach(cn => {
+      if (!cnRows[cn.id]) {
+        initialCnRows[cn.id] = {
+          saoMeta: String(cn.meta_sao || ''),
+          saoRealizado: '',
+          vidasMeta: String(cn.meta_vidas || ''),
+          vidasRealizado: '',
+          comissao: 0,
+          pctSAO: 0,
+          pctVidas: 0,
+          scoreFinal: 0,
+          multiplicador: 0,
+          bonus: '0',
+          total: 0
+        };
+      }
+    });
+    if (Object.keys(initialCnRows).length > 0) {
+      setCnRows(prev => ({ ...initialCnRows, ...prev }));
+    }
+
+    // Initialize EV rows with stored goals
+    const initialEvRows: Record<string, EVRow> = {};
+    evs.forEach(ev => {
+      if (!evRows[ev.id]) {
+        initialEvRows[ev.id] = {
+          comissaoSafra: 0,
+          metaMRR: String(ev.meta_mrr || ''),
+          mrrRealizado: '',
+          pctAtingimento: 0,
+          multiplicador: 0,
+          bonusEV: 0,
+          total: 0
+        };
+      }
+    });
+    if (Object.keys(initialEvRows).length > 0) {
+      setEvRows(prev => ({ ...initialEvRows, ...prev }));
+    }
+
+    setHasInitializedMetas(true);
+  }, [cns, evs, loadingColaboradores, hasInitializedMetas, draftId, cnRows, evRows]);
 
   // Recalculate leader's Meta MRR whenever EV rows change
   useEffect(() => {

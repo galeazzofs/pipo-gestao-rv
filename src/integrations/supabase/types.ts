@@ -290,6 +290,9 @@ export type Database = {
           email: string
           id: string
           lider_id: string | null
+          meta_mrr: number | null
+          meta_sao: number | null
+          meta_vidas: number | null
           nivel: string | null
           nome: string
           salario_base: number | null
@@ -303,6 +306,9 @@ export type Database = {
           email: string
           id?: string
           lider_id?: string | null
+          meta_mrr?: number | null
+          meta_sao?: number | null
+          meta_vidas?: number | null
           nivel?: string | null
           nome: string
           salario_base?: number | null
@@ -316,6 +322,9 @@ export type Database = {
           email?: string
           id?: string
           lider_id?: string | null
+          meta_mrr?: number | null
+          meta_sao?: number | null
+          meta_vidas?: number | null
           nivel?: string | null
           nome?: string
           salario_base?: number | null

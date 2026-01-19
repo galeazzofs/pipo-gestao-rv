@@ -12,6 +12,9 @@ export interface Colaborador {
   nivel: string | null;
   lider_id: string | null;
   salario_base: number;
+  meta_mrr: number;
+  meta_sao: number;
+  meta_vidas: number;
   ativo: boolean;
   created_at: string;
   updated_at: string;
@@ -26,6 +29,9 @@ export interface ColaboradorInput {
   nivel?: string | null;
   lider_id?: string | null;
   salario_base?: number;
+  meta_mrr?: number;
+  meta_sao?: number;
+  meta_vidas?: number;
   ativo?: boolean;
 }
 
@@ -68,6 +74,9 @@ export function useColaboradores() {
           nivel: input.cargo === 'CN' ? input.nivel : null,
           lider_id: input.lider_id || null,
           salario_base: input.salario_base || 0,
+          meta_mrr: input.cargo === 'EV' ? (input.meta_mrr || 0) : 0,
+          meta_sao: input.cargo === 'CN' ? (input.meta_sao || 0) : 0,
+          meta_vidas: input.cargo === 'CN' ? (input.meta_vidas || 0) : 0,
           ativo: input.ativo ?? true,
         });
 
@@ -87,9 +96,16 @@ export function useColaboradores() {
     try {
       const updateData: any = { ...input };
       
-      // Se cargo não é CN, nivel deve ser null
+      // Se cargo não é CN, nivel deve ser null e metas de CN zeradas
       if (input.cargo && input.cargo !== 'CN') {
         updateData.nivel = null;
+        updateData.meta_sao = 0;
+        updateData.meta_vidas = 0;
+      }
+      
+      // Se cargo não é EV, meta MRR zerada
+      if (input.cargo && input.cargo !== 'EV') {
+        updateData.meta_mrr = 0;
       }
 
       const { error } = await supabase

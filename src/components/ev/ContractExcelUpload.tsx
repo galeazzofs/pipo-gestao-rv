@@ -210,7 +210,8 @@ export function ContractExcelUpload({ onContractsLoaded }: ContractExcelUploadPr
         if (mapping.atingimento >= 0 && row[mapping.atingimento] !== undefined) {
           const raw = row[mapping.atingimento];
           if (typeof raw === 'number') {
-            atingimento = raw > 1 ? raw : raw * 100;
+            // Valores sempre vêm em percentual direto (ex: 120 = 120%)
+            atingimento = raw;
           } else if (typeof raw === 'string') {
             atingimento = parseFloat(raw.replace('%', '').replace(',', '.')) || 100;
           }

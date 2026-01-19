@@ -63,6 +63,9 @@ interface FormData {
   nivel: string;
   lider_id: string;
   salario_base: string;
+  meta_mrr: string;
+  meta_sao: string;
+  meta_vidas: string;
 }
 
 const emptyForm: FormData = {
@@ -72,6 +75,9 @@ const emptyForm: FormData = {
   nivel: 'CN1',
   lider_id: '',
   salario_base: '0',
+  meta_mrr: '0',
+  meta_sao: '0',
+  meta_vidas: '0',
 };
 
 export default function GestaoTime() {
@@ -107,6 +113,9 @@ export default function GestaoTime() {
       nivel: colaborador.nivel || 'CN1',
       lider_id: colaborador.lider_id || '',
       salario_base: String(colaborador.salario_base || 0),
+      meta_mrr: String(colaborador.meta_mrr || 0),
+      meta_sao: String(colaborador.meta_sao || 0),
+      meta_vidas: String(colaborador.meta_vidas || 0),
     });
     setIsDialogOpen(true);
   };
@@ -122,6 +131,9 @@ export default function GestaoTime() {
       nivel: formData.cargo === 'CN' ? formData.nivel : null,
       lider_id: formData.lider_id || null,
       salario_base: parseFloat(formData.salario_base) || 0,
+      meta_mrr: formData.cargo === 'EV' ? parseFloat(formData.meta_mrr) || 0 : 0,
+      meta_sao: formData.cargo === 'CN' ? parseFloat(formData.meta_sao) || 0 : 0,
+      meta_vidas: formData.cargo === 'CN' ? parseFloat(formData.meta_vidas) || 0 : 0,
     };
 
     let success = false;
@@ -286,6 +298,52 @@ export default function GestaoTime() {
                     />
                   </div>
 
+                  {/* Metas para CNs */}
+                  {formData.cargo === 'CN' && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="meta_sao">Meta SAO</Label>
+                        <Input
+                          id="meta_sao"
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={formData.meta_sao}
+                          onChange={(e) => setFormData({ ...formData, meta_sao: e.target.value })}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="meta_vidas">Meta Vidas</Label>
+                        <Input
+                          id="meta_vidas"
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={formData.meta_vidas}
+                          onChange={(e) => setFormData({ ...formData, meta_vidas: e.target.value })}
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Meta para EVs */}
+                  {formData.cargo === 'EV' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="meta_mrr">Meta MRR (R$)</Label>
+                      <Input
+                        id="meta_mrr"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.meta_mrr}
+                        onChange={(e) => setFormData({ ...formData, meta_mrr: e.target.value })}
+                        placeholder="0,00"
+                      />
+                    </div>
+                  )}
+
                   <div className="flex justify-end gap-2 pt-4">
                     <Button
                       type="button"
@@ -356,6 +414,9 @@ export default function GestaoTime() {
                     <TableHead>Cargo</TableHead>
                     <TableHead>Nível</TableHead>
                     <TableHead className="text-right">Salário Base</TableHead>
+                    <TableHead className="text-right">Meta MRR</TableHead>
+                    <TableHead className="text-right">Meta SAO</TableHead>
+                    <TableHead className="text-right">Meta Vidas</TableHead>
                     <TableHead className="text-center">Status</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
@@ -375,6 +436,15 @@ export default function GestaoTime() {
                       </TableCell>
                       <TableCell className="text-right">
                         {formatCurrency(colaborador.salario_base)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {colaborador.cargo === 'EV' ? formatCurrency(colaborador.meta_mrr || 0) : '-'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {colaborador.cargo === 'CN' ? (colaborador.meta_sao || 0) : '-'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {colaborador.cargo === 'CN' ? (colaborador.meta_vidas || 0) : '-'}
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge variant={colaborador.ativo ? 'default' : 'secondary'}>

@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { History, Receipt, CalendarCheck, DollarSign, Users, ChevronDown, ChevronRight, Trash2, Crown, Briefcase, FileEdit } from 'lucide-react';
+import { History, Receipt, CalendarCheck, DollarSign, Users, ChevronDown, ChevronRight, Trash2, Crown, Briefcase, FileEdit, Play } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,7 @@ import {
 } from '@/components/ui/table';
 
 function HistoricoApuracoesContent() {
+  const navigate = useNavigate();
   const { apuracoes, isLoading, deleteApuracao, getApuracaoItens } = useApuracoesFechadas();
   const [selectedTipo, setSelectedTipo] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
@@ -78,6 +80,24 @@ function HistoricoApuracoesContent() {
 
   const handleDelete = async (id: string) => {
     await deleteApuracao(id);
+  };
+
+  // Navigate to continue editing a draft
+  const handleContinueEditing = (apuracao: typeof apuracoes[0]) => {
+    // Parse mes_referencia (e.g., "Q1/2025" or "Jan/2025")
+    const mesRef = apuracao.mes_referencia;
+    
+    if (apuracao.tipo === 'trimestral') {
+      // Extract quarter and year from "Q1/2025"
+      const match = mesRef.match(/^(Q[1-4])\/(\d{4})$/);
+      if (match) {
+        const [, quarter, year] = match;
+        navigate(`/hub/apuracao-trimestral?q=${quarter}&year=${year}`);
+      }
+    } else {
+      // For mensal, navigate to mensal page
+      navigate(`/hub/apuracao-mensal?mes=${mesRef}`);
+    }
   };
 
   // Group items by cargo
@@ -263,7 +283,21 @@ function HistoricoApuracoesContent() {
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-3">
+                            {isRascunho && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1.5"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleContinueEditing(apuracao);
+                                }}
+                              >
+                                <Play className="h-3.5 w-3.5" />
+                                Continuar Editando
+                              </Button>
+                            )}
                             <div className="text-right">
                               <p className="text-2xl font-bold text-primary">
                                 {formatCurrency(apuracao.total_geral || 0)}
@@ -455,25 +489,25 @@ function HistoricoApuracoesContent() {
                                               {formatCurrency(item.colaborador?.salario_base || 0)}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                              {formatCurrency((item as any).meta_mrr_lider || 0)}
+                                              {item.meta_mrr_lider != null ? formatCurrency(item.meta_mrr_lider) : '-'}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                              {(item as any).meta_sql_lider || '-'}
+                                              {item.meta_sql_lider != null ? item.meta_sql_lider : '-'}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                              {formatCurrency((item as any).realizado_mrr_lider || 0)}
+                                              {item.realizado_mrr_lider != null ? formatCurrency(item.realizado_mrr_lider) : '-'}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                              {(item as any).realizado_sql_lider || '-'}
+                                              {item.realizado_sql_lider != null ? item.realizado_sql_lider : '-'}
                                             </TableCell>
                                             <TableCell className="text-center">
-                                              {(item as any).pct_mrr_lider ? `${((item as any).pct_mrr_lider).toFixed(1)}%` : '-'}
+                                              {item.pct_mrr_lider != null ? `${item.pct_mrr_lider.toFixed(1)}%` : '-'}
                                             </TableCell>
                                             <TableCell className="text-center">
-                                              {(item as any).pct_sql_lider ? `${((item as any).pct_sql_lider).toFixed(1)}%` : '-'}
+                                              {item.pct_sql_lider != null ? `${item.pct_sql_lider.toFixed(1)}%` : '-'}
                                             </TableCell>
                                             <TableCell className="text-center">
-                                              <Badge variant="secondary">{(item as any).multiplicador_lider || 0}x</Badge>
+                                              <Badge variant="secondary">{item.multiplicador_lider || 0}x</Badge>
                                             </TableCell>
                                             <TableCell className="text-right font-bold text-primary">
                                               {formatCurrency(item.bonus_lideranca || 0)}

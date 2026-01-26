@@ -1,12 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { AdminRoute } from '@/components/AdminRoute';
 import { useColaboradores } from '@/hooks/useColaboradores';
-import { useApuracoesFechadas, ApuracaoItemInput } from '@/hooks/useApuracoesFechadas';
+import { useApuracoesFechadas, ApuracaoItemInput, ApuracaoFechadaItem } from '@/hooks/useApuracoesFechadas';
 import { calcularComissaoCN, CNLevel, CN_TARGETS } from '@/lib/cnCalculations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -28,7 +27,9 @@ import {
   Calculator,
   Save,
   Loader2,
-  Info
+  Info,
+  Clock,
+  FileCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -36,6 +37,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const MESES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -62,55 +65,100 @@ interface CNRow {
 
 export default function ApuracaoMensal() {
   const { colaboradores, isLoading: loadingColaboradores, getCNs } = useColaboradores();
-  const { saveApuracao, isLoading: loadingApuracoes } = useApuracoesFechadas();
+  const { saveApuracao, saveDraft, loadDraft, isLoading: loadingApuracoes } = useApuracoesFechadas();
   
   const currentDate = new Date();
   const [mes, setMes] = useState(MESES[currentDate.getMonth()]);
   const [ano, setAno] = useState(String(currentDate.getFullYear()));
+  
+  // Estados de salvamento/carregamento
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [isLoadingDraft, setIsLoadingDraft] = useState(false);
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   
   const cns = getCNs();
 
   // Estado para cada linha de CN
   const [rows, setRows] = useState<Record<string, Omit<CNRow, 'colaboradorId' | 'nome' | 'nivel' | 'target'>>>({});
 
-  // Inicializar rows quando colaboradores carregam
-  useMemo(() => {
-    const newRows: Record<string, Omit<CNRow, 'colaboradorId' | 'nome' | 'nivel' | 'target'>> = {};
+  const mesReferencia = `${mes.slice(0, 3)}/${ano}`;
+
+  // Função para carregar rascunho existente
+  const loadExistingDraft = useCallback(async () => {
+    setIsLoadingDraft(true);
+    const draft = await loadDraft('mensal', mesReferencia);
+    
+    if (draft) {
+      setDraftId(draft.apuracao.id);
+      setLastSaved(draft.apuracao.updated_at ? new Date(draft.apuracao.updated_at) : null);
+      
+      const newRows: Record<string, any> = {};
+      
+      draft.itens.forEach((item: ApuracaoFechadaItem) => {
+        if (item.colaborador_id) {
+          newRows[item.colaborador_id] = {
+            saoMeta: item.sao_meta?.toString() || '',
+            saoRealizado: item.sao_realizado?.toString() || '',
+            vidasMeta: item.vidas_meta?.toString() || '',
+            vidasRealizado: item.vidas_realizado?.toString() || '',
+            comissao: item.comissao_base || 0,
+            pctSAO: item.pct_sao || 0,
+            pctVidas: item.pct_vidas || 0,
+            scoreFinal: item.score_final || 0,
+            multiplicador: item.multiplicador || 0,
+          };
+        }
+      });
+      
+      setRows(newRows);
+      toast.info('Rascunho carregado');
+    } else {
+      setDraftId(null);
+      setLastSaved(null);
+      setRows({});
+    }
+    
+    setIsLoadingDraft(false);
+  }, [loadDraft, mesReferencia]);
+
+  // Carregar rascunho ao mudar mês/ano ou terminar de carregar colaboradores
+  useEffect(() => {
+    if (!loadingColaboradores) {
+      loadExistingDraft();
+    }
+  }, [mes, ano, loadingColaboradores]);
+
+  // Inicializar rows vazias se não houver rascunho (apenas para garantir estrutura)
+  useEffect(() => {
+    if (loadingColaboradores || isLoadingDraft || draftId) return;
+
+    const newRows: Record<string, any> = {};
+    let hasChanges = false;
+
     cns.forEach(cn => {
       if (!rows[cn.id]) {
         newRows[cn.id] = {
-          saoMeta: '',
-          saoRealizado: '',
-          vidasMeta: '',
-          vidasRealizado: '',
-          comissao: 0,
-          pctSAO: 0,
-          pctVidas: 0,
-          scoreFinal: 0,
-          multiplicador: 0,
+          saoMeta: '', saoRealizado: '', vidasMeta: '', vidasRealizado: '',
+          comissao: 0, pctSAO: 0, pctVidas: 0, scoreFinal: 0, multiplicador: 0,
         };
+        hasChanges = true;
       } else {
         newRows[cn.id] = rows[cn.id];
       }
     });
-    if (Object.keys(newRows).length > 0 && JSON.stringify(newRows) !== JSON.stringify(rows)) {
+
+    if (hasChanges) {
       setRows(newRows);
     }
-  }, [cns]);
+  }, [cns, loadingColaboradores, isLoadingDraft, draftId, rows]);
 
   const updateRow = (colaboradorId: string, field: keyof CNRow, value: string) => {
     setRows(prev => {
       const current = prev[colaboradorId] || {
-        saoMeta: '',
-        saoRealizado: '',
-        vidasMeta: '',
-        vidasRealizado: '',
-        comissao: 0,
-        pctSAO: 0,
-        pctVidas: 0,
-        scoreFinal: 0,
-        multiplicador: 0,
+        saoMeta: '', saoRealizado: '', vidasMeta: '', vidasRealizado: '',
+        comissao: 0, pctSAO: 0, pctVidas: 0, scoreFinal: 0, multiplicador: 0,
       };
 
       const updated = { ...current, [field]: value };
@@ -152,63 +200,84 @@ export default function ApuracaoMensal() {
     return `${(value * 100).toFixed(1)}%`;
   };
 
-  const handleSave = async () => {
-    // Validar se há pelo menos uma linha preenchida
-    const linhasPreenchidas = cns.filter(cn => {
+  // Constrói o array de itens para salvar (usado tanto para Rascunho quanto Finalizar)
+  const buildItensArray = (onlyComplete = true): ApuracaoItemInput[] => {
+    const itens: ApuracaoItemInput[] = [];
+
+    cns.forEach(cn => {
       const row = rows[cn.id];
-      return row && row.saoMeta && row.saoRealizado && row.vidasMeta && row.vidasRealizado;
+      if (!row) return;
+
+      const isComplete = row.saoMeta && row.saoRealizado && row.vidasMeta && row.vidasRealizado;
+      const hasAnyData = row.saoMeta || row.saoRealizado || row.vidasMeta || row.vidasRealizado;
+
+      // Para finalizar, exige completo. Para rascunho, basta ter algum dado.
+      if ((onlyComplete && isComplete) || (!onlyComplete && hasAnyData)) {
+        itens.push({
+          colaborador_id: cn.id,
+          sao_meta: parseFloat(row.saoMeta) || 0,
+          sao_realizado: parseFloat(row.saoRealizado) || 0,
+          vidas_meta: parseFloat(row.vidasMeta) || 0,
+          vidas_realizado: parseFloat(row.vidasRealizado) || 0,
+          pct_sao: row.pctSAO,
+          pct_vidas: row.pctVidas,
+          score_final: row.scoreFinal,
+          multiplicador: row.multiplicador,
+          comissao_base: row.comissao,
+          total_pagar: row.comissao,
+        });
+      }
     });
 
-    if (linhasPreenchidas.length === 0) {
-      toast.error('Preencha pelo menos um CN para salvar');
+    return itens;
+  };
+
+  const handleSaveDraft = async () => {
+    const itens = buildItensArray(false); // Permite dados parciais
+    
+    if (itens.length === 0) {
+      toast.error('Preencha algum dado para salvar rascunho');
+      return;
+    }
+
+    setIsSavingDraft(true);
+    const result = await saveDraft('mensal', mesReferencia, itens);
+    setIsSavingDraft(false);
+
+    if (result) {
+      setDraftId(result);
+      setLastSaved(new Date());
+    }
+  };
+
+  const handleFinalize = async () => {
+    const itens = buildItensArray(true); // Exige dados completos para os itens incluídos
+
+    if (itens.length === 0) {
+      toast.error('Nenhum CN com dados completos para finalizar');
       return;
     }
 
     setIsSaving(true);
-
-    const mesReferencia = `${mes.slice(0, 3)}/${ano}`;
-    
-    const itens: ApuracaoItemInput[] = linhasPreenchidas.map(cn => {
-      const row = rows[cn.id];
-      return {
-        colaborador_id: cn.id,
-        sao_meta: parseFloat(row.saoMeta) || 0,
-        sao_realizado: parseFloat(row.saoRealizado) || 0,
-        vidas_meta: parseFloat(row.vidasMeta) || 0,
-        vidas_realizado: parseFloat(row.vidasRealizado) || 0,
-        pct_sao: row.pctSAO,
-        pct_vidas: row.pctVidas,
-        score_final: row.scoreFinal,
-        multiplicador: row.multiplicador,
-        comissao_base: row.comissao,
-        total_pagar: row.comissao,
-      };
-    });
-
     const result = await saveApuracao('mensal', mesReferencia, itens);
     setIsSaving(false);
 
     if (result) {
-      // Limpar formulário após salvar
+      // Limpar formulário após finalizar
       const clearedRows: Record<string, any> = {};
       cns.forEach(cn => {
         clearedRows[cn.id] = {
-          saoMeta: '',
-          saoRealizado: '',
-          vidasMeta: '',
-          vidasRealizado: '',
-          comissao: 0,
-          pctSAO: 0,
-          pctVidas: 0,
-          scoreFinal: 0,
-          multiplicador: 0,
+          saoMeta: '', saoRealizado: '', vidasMeta: '', vidasRealizado: '',
+          comissao: 0, pctSAO: 0, pctVidas: 0, scoreFinal: 0, multiplicador: 0,
         };
       });
       setRows(clearedRows);
+      setDraftId(null);
+      setLastSaved(null);
     }
   };
 
-  const isLoading = loadingColaboradores || loadingApuracoes;
+  const hasAnyData = Object.values(rows).some(r => r.saoMeta || r.saoRealizado);
 
   return (
     <AdminRoute>
@@ -217,7 +286,7 @@ export default function ApuracaoMensal() {
         
         <div className="max-w-7xl mx-auto px-4 py-8">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center">
                 <Receipt className="w-6 h-6 text-orange-600" />
@@ -254,6 +323,19 @@ export default function ApuracaoMensal() {
             </div>
           </div>
 
+          {/* Draft Status */}
+          {(draftId || lastSaved) && (
+            <div className="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-amber-600" />
+              <span className="text-sm text-amber-700 dark:text-amber-400">
+                {lastSaved 
+                  ? `Rascunho salvo em ${format(lastSaved, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`
+                  : 'Rascunho carregado'
+                }
+              </span>
+            </div>
+          )}
+
           {/* Info Card */}
           <div className="card-premium p-4 mb-6 flex items-start gap-3 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
             <Info className="w-5 h-5 text-blue-600 mt-0.5" />
@@ -267,9 +349,12 @@ export default function ApuracaoMensal() {
 
           {/* Table */}
           <div className="card-premium overflow-hidden mb-6">
-            {isLoading ? (
+            {loadingColaboradores || isLoadingDraft ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-muted-foreground">
+                  {isLoadingDraft ? 'Carregando rascunho...' : 'Carregando colaboradores...'}
+                </span>
               </div>
             ) : cns.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
@@ -385,9 +470,9 @@ export default function ApuracaoMensal() {
             )}
           </div>
 
-          {/* Footer */}
+          {/* Footer Actions */}
           {cns.length > 0 && (
-            <div className="card-premium p-6">
+            <div className="card-premium p-6 sticky bottom-4 z-10 shadow-lg border-t bg-background/95 backdrop-blur">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <Calculator className="w-5 h-5 text-muted-foreground" />
@@ -399,18 +484,34 @@ export default function ApuracaoMensal() {
                   </div>
                 </div>
 
-                <Button 
-                  onClick={handleSave} 
-                  disabled={isSaving || totalComissoes === 0}
-                  className="gap-2"
-                >
-                  {isSaving ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Save className="w-4 h-4" />
-                  )}
-                  Salvar Fechamento Mensal
-                </Button>
+                <div className="flex items-center gap-3">
+                  <Button 
+                    variant="outline"
+                    onClick={handleSaveDraft} 
+                    disabled={isSavingDraft || !hasAnyData}
+                    className="gap-2"
+                  >
+                    {isSavingDraft ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4" />
+                    )}
+                    Salvar Rascunho
+                  </Button>
+
+                  <Button 
+                    onClick={handleFinalize} 
+                    disabled={isSaving || totalComissoes === 0}
+                    className="gap-2"
+                  >
+                    {isSaving ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <FileCheck className="w-4 h-4" />
+                    )}
+                    Finalizar Fechamento
+                  </Button>
+                </div>
               </div>
             </div>
           )}

@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Contract } from '@/lib/evCalculations';
 import { useContracts } from './useContracts';
-import { addMonths, differenceInMonths, parseISO, isAfter } from 'date-fns';
+import { addMonths, parseISO } from 'date-fns';
 
 export interface ForecastContract {
   contractId: string;
@@ -14,6 +13,7 @@ export interface ForecastContract {
   dataInicio: Date;
   dataFim: Date;
   mesesPagos: number;
+  mesesPagosManual: number; // Para debug se necessário
   parcelasRestantes: number;
   ultimaComissao: number | null;
   valorProjetado: number;
@@ -25,16 +25,17 @@ interface PaymentHistory {
   contract_id: string;
   meses_pagos: number;
   ultima_comissao: number;
-  ultimo_mes_pago: string | null;
+  ultimo_mes_pago: Date | null;
+  meses_unicos: Set<string>;
 }
 
 export function useForecast() {
   const { contracts, isLoading: contractsLoading } = useContracts();
   const [forecastData, setForecastData] = useState<ForecastContract[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [ultimaApuracaoId, setUltimaApuracaoId] = useState<string | null>(null);
 
   const fetchForecastData = useCallback(async () => {
+    // Se não houver contratos, não há o que projetar
     if (contracts.length === 0) {
       setForecastData([]);
       setIsLoading(false);
@@ -44,34 +45,33 @@ export function useForecast() {
     setIsLoading(true);
 
     try {
-      // 1. Buscar última apuração
+      // 1. Buscar última apuração FINALIZADA para cálculo de Churn
       const { data: ultimaApuracao } = await supabase
-        .from('apuracoes')
-        .select('id, data_processamento')
-        .order('data_processamento', { ascending: false })
+        .from('apuracoes_fechadas')
+        .select('id, data_fechamento')
+        .order('data_fechamento', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      setUltimaApuracaoId(ultimaApuracao?.id || null);
+      const ultimaApuracaoId = ultimaApuracao?.id;
 
-      // 2. Buscar histórico de pagamentos por contrato
-      const { data: paymentHistory, error: historyError } = await supabase
-        .from('apuracao_itens')
-        .select('contract_id, comissao, mes_recebimento, apuracao_id')
-        .eq('status', 'valido')
-        .not('contract_id', 'is', null);
+      // 2. Buscar histórico de pagamentos REALIZADOS (nova tabela)
+      const { data: payments, error: paymentsError } = await supabase
+        .from('contract_payments')
+        .select('contract_id, valor_pago, data_parcela, apuracao_id')
+        .order('data_parcela', { ascending: true });
 
-      if (historyError) throw historyError;
+      if (paymentsError) throw paymentsError;
 
       // 3. Agregar dados por contrato
       const historyByContract: Record<string, PaymentHistory> = {};
       const contractsInLastApuracao = new Set<string>();
 
-      paymentHistory?.forEach((item) => {
+      payments?.forEach((item) => {
         if (!item.contract_id) return;
 
-        // Verificar se apareceu na última apuração
-        if (item.apuracao_id === ultimaApuracao?.id) {
+        // Verificar se este contrato teve pagamento na última apuração fechada
+        if (ultimaApuracaoId && item.apuracao_id === ultimaApuracaoId) {
           contractsInLastApuracao.add(item.contract_id);
         }
 
@@ -81,28 +81,53 @@ export function useForecast() {
             meses_pagos: 0,
             ultima_comissao: 0,
             ultimo_mes_pago: null,
+            meses_unicos: new Set(),
           };
         }
 
-        historyByContract[item.contract_id].meses_pagos += 1;
+        const history = historyByContract[item.contract_id];
         
-        // Guardar a comissão mais recente
-        if (item.comissao && item.comissao > 0) {
-          historyByContract[item.contract_id].ultima_comissao = Number(item.comissao);
-          historyByContract[item.contract_id].ultimo_mes_pago = item.mes_recebimento;
+        // Identificar mês único (YYYY-MM) para contagem correta de parcelas
+        const dataParcela = new Date(item.data_parcela);
+        const mesChave = `${dataParcela.getFullYear()}-${dataParcela.getMonth()}`;
+        
+        history.meses_unicos.add(mesChave);
+        history.meses_pagos = history.meses_unicos.size;
+
+        // Atualizar última comissão e data (se houver valor)
+        if (item.valor_pago > 0) {
+          history.ultima_comissao = Number(item.valor_pago);
+          history.ultimo_mes_pago = dataParcela;
         }
       });
 
       // 4. Construir forecast para cada contrato
-      const today = new Date();
       const forecast: ForecastContract[] = contracts.map((contract) => {
         const dataInicio = parseISO(contract.dataInicio);
-        const dataFim = addMonths(dataInicio, 11); // 12 meses total
+        const dataFim = addMonths(dataInicio, 11); // 12 meses de vigência
         const history = historyByContract[contract.id];
 
-        const mesesPagos = history?.meses_pagos || 0;
-        const parcelasRestantes = Math.max(0, 12 - mesesPagos);
+        // LOGICA DE SOMA: Sistema + Manual
+        const mesesPagosSistema = history?.meses_pagos || 0;
+        const mesesPagosManual = contract.mesesPagosManual || 0;
+        const mesesPagosTotal = mesesPagosSistema + mesesPagosManual;
+
+        // Calcula restantes (travando em 0)
+        const parcelasRestantes = Math.max(0, 12 - mesesPagosTotal);
+        
+        // Se não tiver histórico no sistema, mas tiver manual, usamos 0 como base por enquanto
+        // (o valor projetado aparecerá quando entrar a primeira parcela no sistema)
         const ultimaComissao = history?.ultima_comissao || null;
+
+        // Formatar último mês pago para exibição
+        let ultimoMesPagoStr: string | null = null;
+        if (history?.ultimo_mes_pago) {
+          const d = history.ultimo_mes_pago;
+          const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+          ultimoMesPagoStr = `${months[d.getMonth()]}/${d.getFullYear()}`;
+        } else if (mesesPagosManual > 0) {
+          ultimoMesPagoStr = "Legado";
+        }
 
         // Determinar status
         let status: 'ativo' | 'finalizado' | 'churn_risk' = 'ativo';
@@ -110,15 +135,18 @@ export function useForecast() {
         if (parcelasRestantes === 0) {
           status = 'finalizado';
         } else if (
-          ultimaApuracao &&
-          parcelasRestantes > 0 &&
-          mesesPagos > 0 && // Já teve pagamentos antes
-          !contractsInLastApuracao.has(contract.id)
+          ultimaApuracaoId && // Existe apuração no sistema
+          parcelasRestantes > 0 && // Ainda falta receber
+          mesesPagosSistema > 0 && // Já começou a receber PELO SISTEMA
+          !contractsInLastApuracao.has(contract.id) // Falhou na última
         ) {
+          // Só consideramos churn risk se já tiver entrado no fluxo automático do sistema
+          // Se for legado puro e ainda não caiu a primeira no sistema, não é churn risk ainda
           status = 'churn_risk';
         }
 
-        // Calcular valor projetado (zero se churn risk)
+        // Calcular valor projetado
+        // Se só tiver legado (sem comissão registrada), valor projetado é 0 até entrar a primeira
         const valorProjetado = status === 'churn_risk' 
           ? 0 
           : (ultimaComissao || 0) * parcelasRestantes;
@@ -132,12 +160,13 @@ export function useForecast() {
           porte: contract.porte,
           dataInicio,
           dataFim,
-          mesesPagos,
+          mesesPagos: mesesPagosTotal, // Soma para exibição
+          mesesPagosManual,
           parcelasRestantes,
           ultimaComissao,
           valorProjetado,
           status,
-          ultimoMesPago: history?.ultimo_mes_pago || null,
+          ultimoMesPago: ultimoMesPagoStr,
         };
       });
 

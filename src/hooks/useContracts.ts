@@ -7,7 +7,6 @@ export function useContracts() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Carrega contratos do banco na inicialização
   const fetchContracts = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -31,7 +30,8 @@ export function useContracts() {
           operadora: row.operadora,
           porte: row.porte as Porte,
           atingimento: Number(row.atingimento),
-          dataInicio: row.data_inicio
+          dataInicio: row.data_inicio,
+          mesesPagosManual: row.meses_pagos_manual || 0
         })));
       }
     } catch (error) {
@@ -60,6 +60,7 @@ export function useContracts() {
           porte: contract.porte,
           atingimento: contract.atingimento,
           data_inicio: contract.dataInicio,
+          meses_pagos_manual: contract.mesesPagosManual || 0,
           created_by: user?.id
         })
         .select()
@@ -81,7 +82,6 @@ export function useContracts() {
     }
   }, [fetchContracts]);
 
-  // Adicionar múltiplos contratos de uma vez (para um mesmo cliente)
   const addContracts = useCallback(async (contracts: Omit<Contract, 'id'>[]) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -94,6 +94,7 @@ export function useContracts() {
         porte: contract.porte,
         atingimento: contract.atingimento,
         data_inicio: contract.dataInicio,
+        meses_pagos_manual: contract.mesesPagosManual || 0,
         created_by: user?.id
       }));
 
@@ -119,7 +120,8 @@ export function useContracts() {
 
   const updateContract = useCallback(async (id: string, updates: Partial<Omit<Contract, 'id'>>) => {
     try {
-      const updateData: Record<string, unknown> = {};
+      const updateData: Record<string, any> = {};
+      
       if (updates.nomeEV !== undefined) updateData.nome_ev = updates.nomeEV;
       if (updates.cliente !== undefined) updateData.cliente = updates.cliente;
       if (updates.produto !== undefined) updateData.produto = updates.produto;
@@ -127,10 +129,13 @@ export function useContracts() {
       if (updates.porte !== undefined) updateData.porte = updates.porte;
       if (updates.atingimento !== undefined) updateData.atingimento = updates.atingimento;
       if (updates.dataInicio !== undefined) updateData.data_inicio = updates.dataInicio;
+      if (updates.mesesPagosManual !== undefined) updateData.meses_pagos_manual = updates.mesesPagosManual;
 
       const { error } = await supabase
         .from('ev_contracts')
-        .update(updateData)
+        // O uso de 'as any' aqui resolve o erro de tipagem estrita do TypeScript
+        // garantindo que o objeto seja aceito mesmo se a definição de tipos estiver rígida
+        .update(updateData as any)
         .eq('id', id);
 
       if (error) {

@@ -14,16 +14,15 @@ export function useContractApuracoes() {
   const fetchApuracaoInfo = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Buscar a primeira apuração de cada contrato e contar meses processados
+      // CORREÇÃO: Agora buscamos da tabela correta 'contract_payments'
+      // onde as apurações trimestrais salvam as baixas
       const { data, error } = await supabase
-        .from('apuracao_itens')
-        .select('contract_id, created_at, mes_recebimento')
-        .not('contract_id', 'is', null)
-        .eq('status', 'valido')
-        .order('created_at', { ascending: true });
+        .from('contract_payments')
+        .select('contract_id, created_at, data_parcela')
+        .order('data_parcela', { ascending: true });
 
       if (error) {
-        console.error('Error fetching apuracao info:', error);
+        console.error('Error fetching contract payments info:', error);
         return;
       }
 
@@ -35,31 +34,39 @@ export function useContractApuracoes() {
         if (!item.contract_id) return;
 
         const contractId = item.contract_id;
+        // O campo data_parcela vem como string (YYYY-MM-DD) do banco
+        const dataParcela = new Date(item.data_parcela);
+        
+        // Cria uma chave única para o mês (ex: "2024-02") para contar meses distintos
+        // (caso tenha recebido 2 pagamentos no mesmo mês, conta como 1 mês de vigência)
+        const mesChave = `${dataParcela.getFullYear()}-${dataParcela.getMonth()}`;
 
-        // Inicializar se não existe
+        // Inicializar objeto se não existe
         if (!infoByContract[contractId]) {
           infoByContract[contractId] = {
             contractId,
-            primeiraApuracaoData: new Date(item.created_at!),
+            primeiraApuracaoData: dataParcela,
             mesesProcessados: 0,
           };
           mesesPorContrato[contractId] = new Set();
         }
 
-        // Contar meses únicos processados
-        if (item.mes_recebimento) {
-          mesesPorContrato[contractId].add(item.mes_recebimento);
+        // Atualiza a data de início se encontrar uma data anterior
+        if (dataParcela < infoByContract[contractId].primeiraApuracaoData!) {
+          infoByContract[contractId].primeiraApuracaoData = dataParcela;
         }
+
+        mesesPorContrato[contractId].add(mesChave);
       });
 
-      // Atualizar contagem de meses processados
+      // Atualizar contagem final de meses
       Object.keys(infoByContract).forEach((contractId) => {
         infoByContract[contractId].mesesProcessados = mesesPorContrato[contractId]?.size || 0;
       });
 
       setApuracaoInfo(infoByContract);
     } catch (err) {
-      console.error('Error:', err);
+      console.error('Error in useContractApuracoes:', err);
     } finally {
       setIsLoading(false);
     }

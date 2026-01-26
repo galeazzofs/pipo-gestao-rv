@@ -340,6 +340,48 @@ export type Database = {
           },
         ]
       }
+      contract_payments: {
+        Row: {
+          apuracao_id: string
+          contract_id: string
+          created_at: string | null
+          data_parcela: string
+          id: string
+          valor_pago: number
+        }
+        Insert: {
+          apuracao_id: string
+          contract_id: string
+          created_at?: string | null
+          data_parcela: string
+          id?: string
+          valor_pago?: number
+        }
+        Update: {
+          apuracao_id?: string
+          contract_id?: string
+          created_at?: string | null
+          data_parcela?: string
+          id?: string
+          valor_pago?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_payments_apuracao_id_fkey"
+            columns: ["apuracao_id"]
+            isOneToOne: false
+            referencedRelation: "apuracoes_fechadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_payments_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "ev_contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ev_contracts: {
         Row: {
           atingimento: number
@@ -353,6 +395,7 @@ export type Database = {
           porte: string
           produto: string
           updated_at: string | null
+          meses_pagos_manual: number | null
         }
         Insert: {
           atingimento?: number
@@ -366,6 +409,7 @@ export type Database = {
           porte: string
           produto: string
           updated_at?: string | null
+          meses_pagos_manual: number | null
         }
         Update: {
           atingimento?: number
@@ -379,6 +423,7 @@ export type Database = {
           porte?: string
           produto?: string
           updated_at?: string | null
+          meses_pagos_manual: number | null
         }
         Relationships: []
       }

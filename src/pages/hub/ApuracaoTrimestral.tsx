@@ -8,11 +8,11 @@ import { useColaboradores, Colaborador } from '@/hooks/useColaboradores';
 import { useApuracoesFechadas, ApuracaoItemInput, ApuracaoFechadaItem } from '@/hooks/useApuracoesFechadas';
 import { useContracts } from '@/hooks/useContracts';
 import { calcularComissaoCN, CNLevel, CN_TARGETS } from '@/lib/cnCalculations';
-import { processCommissions, groupByEV, calculateTotals } from '@/components/ev/ProcessingEngine';
+import { processCommissions, calculateTotals } from '@/components/ev/ProcessingEngine';
 import { ExcelRow, formatCurrency as formatCurrencyEV, ProcessedResult } from '@/lib/evCalculations';
 import { ResultsDashboard } from '@/components/ev/ResultsDashboard';
 import { ResultsTable } from '@/components/ev/ResultsTable';
-import { getMultiplicadorLideranca, calcularMetaMRRLider, getMRRFaixa, getSQLFaixa, getMultiplicadorColor, MATRIZ_LIDERANCA } from '@/lib/leadershipCalculations';
+import { getMultiplicadorLideranca, calcularMetaMRRLider } from '@/lib/leadershipCalculations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -144,7 +144,7 @@ interface LiderRow {
 export default function ApuracaoTrimestral() {
   const [searchParams] = useSearchParams();
   const { getCNs, getEVs, getLideres, colaboradores, isLoading: loadingColaboradores } = useColaboradores();
-  const { saveDraft, loadDraft, saveApuracao, finalizarApuracao } = useApuracoesFechadas();
+  const { saveDraft, loadDraft, saveApuracao } = useApuracoesFechadas();
   const { contracts, isLoading: loadingContracts } = useContracts();
   
   const currentDate = new Date();
@@ -719,7 +719,21 @@ export default function ApuracaoTrimestral() {
 
     setIsSaving(true);
     const itens = buildItensArray();
-    const result = await saveApuracao('trimestral', mesReferencia, itens);
+
+    // NOVO: Preparar as parcelas detalhadas dos contratos para abater
+    // Filtramos apenas resultados válidos que tenham contrato vinculado
+    const contractPayments = evResults
+      .filter(result => result.status === 'valido' && result.contract)
+      .map(result => ({
+        contract_id: result.contract!.id,
+        // Converte a data do objeto JS para string ISO (YYYY-MM-DD)
+        data_parcela: result.excelRow.dataRecebimento.toISOString(), 
+        valor_pago: result.comissao || 0
+      }));
+
+    // Passamos os pagamentos como 4º argumento
+    const result = await saveApuracao('trimestral', mesReferencia, itens, contractPayments);
+    
     setIsSaving(false);
 
     if (result) {

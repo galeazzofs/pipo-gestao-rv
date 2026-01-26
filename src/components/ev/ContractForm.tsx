@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Contract, Porte, PRODUTOS_DISPONIVEIS } from '@/lib/evCalculations';
-import { Plus, Loader2, Trash2 } from 'lucide-react';
+import { Plus, Loader2, Trash2, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 
 interface ContractFormProps {
   onSubmit: (contracts: Omit<Contract, 'id'>[]) => Promise<unknown> | void;
@@ -20,6 +21,7 @@ interface ContractItem {
   porte: Porte;
   atingimento: string;
   dataInicio: string;
+  mesesPagosManual: string; // Novo campo
 }
 
 const createEmptyItem = (): ContractItem => ({
@@ -28,7 +30,8 @@ const createEmptyItem = (): ContractItem => ({
   operadora: '',
   porte: 'PP/P',
   atingimento: '100',
-  dataInicio: ''
+  dataInicio: '',
+  mesesPagosManual: '0'
 });
 
 export function ContractForm({ onSubmit, existingEVNames }: ContractFormProps) {
@@ -82,7 +85,8 @@ export function ContractForm({ onSubmit, existingEVNames }: ContractFormProps) {
         operadora: item.operadora.trim(),
         porte: item.porte,
         atingimento: parseFloat(item.atingimento) || 100,
-        dataInicio: `${item.dataInicio}-01`
+        dataInicio: `${item.dataInicio}-01`,
+        mesesPagosManual: parseInt(item.mesesPagosManual) || 0 // Mapeando o novo campo
       }));
 
       await onSubmit(contracts);
@@ -168,7 +172,7 @@ export function ContractForm({ onSubmit, existingEVNames }: ContractFormProps) {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Produto</Label>
                   <Select 
@@ -232,6 +236,35 @@ export function ContractForm({ onSubmit, existingEVNames }: ContractFormProps) {
                     value={item.dataInicio}
                     onChange={(e) => handleItemChange(item.id, 'dataInicio', e.target.value)}
                     className="input-field"
+                  />
+                </div>
+
+                {/* Novo Campo: Meses Pagos (Legado) */}
+                <div className="space-y-2">
+                  <TooltipProvider>
+                    <div className="flex items-center gap-2">
+                      <Label>Meses já pagos (Legado)</Label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="w-64">
+                            Quantidade de parcelas já pagas ANTES de usar este sistema. 
+                            Ex: Se o contrato começou há 4 meses, coloque 4 aqui.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </TooltipProvider>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="12"
+                    value={item.mesesPagosManual}
+                    onChange={(e) => handleItemChange(item.id, 'mesesPagosManual', e.target.value)}
+                    className="input-field bg-amber-50 dark:bg-amber-950/10 border-amber-200"
+                    placeholder="0"
                   />
                 </div>
               </div>

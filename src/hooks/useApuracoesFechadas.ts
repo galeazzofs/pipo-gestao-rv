@@ -101,6 +101,13 @@ export interface ApuracaoItemInput {
   observacoes?: string;
 }
 
+// NOVO: Interface para as parcelas detalhadas (para abater do contrato)
+export interface ContractPaymentInput {
+  contract_id: string;
+  data_parcela: string; // ISO Date (YYYY-MM-DD)
+  valor_pago: number;
+}
+
 export function useApuracoesFechadas() {
   const [apuracoes, setApuracoes] = useState<ApuracaoFechada[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -309,7 +316,9 @@ export function useApuracoesFechadas() {
   const saveApuracao = async (
     tipo: TipoApuracao,
     mesReferencia: string,
-    itens: ApuracaoItemInput[]
+    itens: ApuracaoItemInput[],
+    // NOVO PARAMETRO: Pagamentos para abater do contrato (Opcional)
+    contractPayments?: ContractPaymentInput[]
   ): Promise<string | null> => {
     try {
       // Check if draft exists and delete it
@@ -395,6 +404,25 @@ export function useApuracoesFechadas() {
         .insert(itensToInsert);
 
       if (itensError) throw itensError;
+
+      // NOVO: Insere os Pagamentos de Contrato (Abatimento dos meses)
+      if (contractPayments && contractPayments.length > 0) {
+        const paymentsToInsert = contractPayments.map(p => ({
+          apuracao_id: apuracaoData.id,
+          contract_id: p.contract_id,
+          data_parcela: p.data_parcela,
+          valor_pago: p.valor_pago
+        }));
+
+        const { error: paymentsError } = await supabase
+          .from('contract_payments')
+          .insert(paymentsToInsert);
+        
+        if (paymentsError) {
+          console.error("Erro ao salvar histórico de pagamentos:", paymentsError);
+          toast.error("Apuração salva, mas houve erro ao gravar histórico dos contratos.");
+        }
+      }
 
       toast.success(`Apuração ${tipo} finalizada com sucesso!`);
       await fetchApuracoes();

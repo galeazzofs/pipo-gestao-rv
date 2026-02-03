@@ -5,66 +5,79 @@
 
 @layer base {
   :root {
-    --background: 40 23% 96%;
+    /* Fundo: Off-white/Bege muito claro (#F7F6F3) */
+    --background: 45 14% 96%;
+    /* Texto Principal: Cinza quase preto (#2B2B2B) */
     --foreground: 0 0% 17%;
 
+    /* Cards: Branco puro para destacar do fundo bege (#FFFFFF) */
     --card: 0 0% 100%;
     --card-foreground: 0 0% 17%;
 
+    /* Popovers: Branco puro */
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 17%;
 
+    /* Primária: Preto Puro (#000000) */
     --primary: 0 0% 0%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 40 23% 96%;
+    /* Secundária: Cinza claro para fundos de apoio (#F5F5F5) */
+    --secondary: 0 0% 96%;
     --secondary-foreground: 0 0% 17%;
 
-    --muted: 40 10% 94%;
-    --muted-foreground: 0 0% 42%;
+    /* Muted: Para elementos desabilitados ou de menor importância */
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 42%; /* #6B6B6B */
 
-    --accent: 40 23% 96%;
+    /* Accent: Bege de apoio para hovers e seleções (#F3EFE4) */
+    --accent: 45 33% 92%;
     --accent-foreground: 0 0% 17%;
 
-    --destructive: 0 84.2% 60.2%;
+    /* Destructive: Vermelho semântico (#EF4444) */
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 156 68% 39%;
+    /* Success: Verde semântico (#1FA971) */
+    --success: 156 69% 39%;
     --success-foreground: 0 0% 100%;
 
+    /* Bordas e Inputs: Cinza claro (#E2E2E2) */
     --border: 0 0% 89%;
     --input: 0 0% 89%;
-    --ring: 0 0% 0%;
+    --ring: 0 0% 0%; /* Ring preto para foco */
 
-    --radius: 0.75rem;
+    /* Raio da borda: 8px (0.5rem) conforme grid de espaçamento */
+    --radius: 0.5rem; 
   }
 
   .dark {
-    --background: 0 0% 7%;
-    --foreground: 0 0% 95%;
+    /* Modo Escuro Sofisticado (Opcional, mantendo a neutralidade) */
+    --background: 0 0% 10%;
+    --foreground: 45 14% 96%;
 
-    --card: 0 0% 12%;
-    --card-foreground: 0 0% 95%;
+    --card: 0 0% 13%;
+    --card-foreground: 45 14% 96%;
 
-    --popover: 0 0% 12%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 0 0% 13%;
+    --popover-foreground: 45 14% 96%;
 
     --primary: 0 0% 100%;
     --primary-foreground: 0 0% 0%;
 
     --secondary: 0 0% 17%;
-    --secondary-foreground: 0 0% 95%;
+    --secondary-foreground: 0 0% 100%;
 
     --muted: 0 0% 17%;
     --muted-foreground: 0 0% 60%;
 
     --accent: 0 0% 17%;
-    --accent-foreground: 0 0% 95%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 95%;
+    --destructive-foreground: 0 0% 100%;
 
-    --success: 156 68% 39%;
+    --success: 156 69% 39%;
     --success-foreground: 0 0% 100%;
 
     --border: 0 0% 20%;
@@ -85,35 +98,38 @@
 }
 
 @layer components {
+  /* Atualização dos componentes customizados para o novo sistema */
+  
   .card-premium {
-    @apply bg-card rounded-xl shadow-card border border-border/50;
+    /* Removido o background fixo para usar a variável --card e respeitar o tema */
+    @apply bg-card rounded-xl shadow-sm border border-border/60 hover:shadow-md transition-shadow duration-200;
   }
 
   .input-premium {
-    @apply bg-card border border-border rounded-xl px-4 py-3 text-foreground 
-           placeholder:text-muted-foreground focus:outline-none focus:ring-2 
-           focus:ring-primary/20 focus:border-primary transition-all duration-200;
+    @apply bg-background border border-input rounded-lg px-4 py-3 text-foreground 
+           placeholder:text-muted-foreground focus:outline-none focus:ring-1 
+           focus:ring-primary focus:border-primary transition-all duration-200;
   }
 
   .input-field {
-    @apply w-full bg-card border border-border rounded-xl px-4 py-3 text-foreground 
-           placeholder:text-muted-foreground focus:outline-none focus:ring-2 
-           focus:ring-primary/20 focus:border-primary transition-all duration-200;
+    @apply w-full bg-background border border-input rounded-lg px-4 py-3 text-foreground 
+           placeholder:text-muted-foreground focus:outline-none focus:ring-1 
+           focus:ring-primary focus:border-primary transition-all duration-200;
   }
 
   .btn-primary {
-    @apply bg-primary text-primary-foreground font-semibold py-4 px-6 
-           rounded-xl transition-all duration-200 hover:opacity-90 
-           active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-primary text-primary-foreground font-medium py-3 px-6 
+           rounded-lg transition-all duration-200 hover:opacity-90 
+           active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm;
   }
 
   .btn-selector {
-    @apply px-6 py-3 rounded-xl font-medium transition-all duration-200 
-           border border-border text-muted-foreground;
+    @apply px-6 py-3 rounded-lg font-medium transition-all duration-200 
+           border border-border text-muted-foreground bg-transparent hover:bg-secondary/50;
   }
 
   .btn-selector-active {
-    @apply bg-primary text-primary-foreground border-primary;
+    @apply bg-primary text-primary-foreground border-primary hover:bg-primary/90;
   }
 
   .result-value {
@@ -123,10 +139,10 @@
 
 @layer utilities {
   .shadow-card {
-    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+    box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.05), 0 1px 4px -1px rgba(0, 0, 0, 0.02);
   }
 
   .shadow-card-hover {
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
   }
 }

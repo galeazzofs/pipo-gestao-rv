@@ -101,7 +101,6 @@ export interface ApuracaoItemInput {
   observacoes?: string;
 }
 
-// NOVO: Interface para as parcelas detalhadas (para abater do contrato)
 export interface ContractPaymentInput {
   contract_id: string;
   data_parcela: string; // ISO Date (YYYY-MM-DD)
@@ -135,7 +134,7 @@ export function useApuracoesFechadas() {
     fetchApuracoes();
   }, [fetchApuracoes]);
 
-  // Load existing draft for a given tipo + mesReferencia
+  // Load existing draft
   const loadDraft = async (tipo: TipoApuracao, mesReferencia: string): Promise<{ apuracao: ApuracaoFechada; itens: ApuracaoFechadaItem[] } | null> => {
     try {
       const { data: apuracaoData, error: apuracaoError } = await supabase
@@ -169,7 +168,6 @@ export function useApuracoesFechadas() {
     }
   };
 
-  // Save or update a draft
   const saveDraft = async (
     tipo: TipoApuracao,
     mesReferencia: string,
@@ -218,7 +216,6 @@ export function useApuracoesFechadas() {
 
         if (updateError) throw updateError;
 
-        // Delete old items and insert new ones
         await supabase
           .from('apuracoes_fechadas_itens')
           .delete()
@@ -290,34 +287,10 @@ export function useApuracoesFechadas() {
     }
   };
 
-  // Finalize a draft (change status to 'finalizado')
-  const finalizarApuracao = async (id: string): Promise<boolean> => {
-    try {
-      const { error } = await supabase
-        .from('apuracoes_fechadas')
-        .update({ 
-          status: 'finalizado',
-          data_fechamento: new Date().toISOString()
-        })
-        .eq('id', id);
-
-      if (error) throw error;
-
-      toast.success('Apuração finalizada com sucesso!');
-      await fetchApuracoes();
-      return true;
-    } catch (error: any) {
-      console.error('Erro ao finalizar apuração:', error);
-      toast.error(error.message || 'Erro ao finalizar apuração');
-      return false;
-    }
-  };
-
   const saveApuracao = async (
     tipo: TipoApuracao,
     mesReferencia: string,
     itens: ApuracaoItemInput[],
-    // NOVO PARAMETRO: Pagamentos para abater do contrato (Opcional)
     contractPayments?: ContractPaymentInput[]
   ): Promise<string | null> => {
     try {
@@ -370,7 +343,7 @@ export function useApuracoesFechadas() {
 
       if (apuracaoError) throw apuracaoError;
 
-      // Insert items
+      // Insert Items
       const itensToInsert = itens.map(item => ({
         apuracao_id: apuracaoData.id,
         colaborador_id: item.colaborador_id,
@@ -405,8 +378,9 @@ export function useApuracoesFechadas() {
 
       if (itensError) throw itensError;
 
-      // NOVO: Insere os Pagamentos de Contrato (Abatimento dos meses)
+      // --- LÓGICA DE BAIXA AUTOMÁTICA DE CONTRATOS ---
       if (contractPayments && contractPayments.length > 0) {
+        // 1. Inserir pagamentos
         const paymentsToInsert = contractPayments.map(p => ({
           apuracao_id: apuracaoData.id,
           contract_id: p.contract_id,
@@ -420,7 +394,41 @@ export function useApuracoesFechadas() {
         
         if (paymentsError) {
           console.error("Erro ao salvar histórico de pagamentos:", paymentsError);
-          toast.error("Apuração salva, mas houve erro ao gravar histórico dos contratos.");
+        } else {
+          // 2. Verificar e finalizar contratos concluídos
+          // Pega IDs únicos dos contratos afetados
+          const uniqueContractIds = [...new Set(contractPayments.map(p => p.contract_id))];
+
+          for (const contractId of uniqueContractIds) {
+            // Busca dados do contrato (para ver manual) e pagamentos (para ver sistema)
+            const [contractRes, paymentsRes] = await Promise.all([
+              supabase.from('ev_contracts').select('meses_pagos_manual').eq('id', contractId).single(),
+              supabase.from('contract_payments').select('data_parcela').eq('contract_id', contractId)
+            ]);
+
+            if (contractRes.data && paymentsRes.data) {
+              const manual = contractRes.data.meses_pagos_manual || 0;
+              
+              // Conta meses únicos (YYYY-MM) pagos pelo sistema
+              const uniqueMonths = new Set(
+                paymentsRes.data.map(p => {
+                  const d = new Date(p.data_parcela);
+                  return `${d.getFullYear()}-${d.getMonth()}`;
+                })
+              );
+              
+              const sistema = uniqueMonths.size;
+              const total = manual + sistema;
+
+              // Se atingiu 12 meses, desativa o contrato
+              if (total >= 12) {
+                await supabase
+                  .from('ev_contracts')
+                  .update({ ativo: false }) // Supondo que exista coluna 'ativo', senão status='finalizado'
+                  .eq('id', contractId);
+              }
+            }
+          }
         }
       }
 
@@ -473,7 +481,28 @@ export function useApuracoesFechadas() {
     }
   };
 
-  // Filters
+  const finalizarApuracao = async (id: string): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('apuracoes_fechadas')
+        .update({ 
+          status: 'finalizado',
+          data_fechamento: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast.success('Apuração finalizada com sucesso!');
+      await fetchApuracoes();
+      return true;
+    } catch (error: any) {
+      console.error('Erro ao finalizar apuração:', error);
+      toast.error(error.message || 'Erro ao finalizar apuração');
+      return false;
+    }
+  };
+
   const getMensais = useCallback(() => {
     return apuracoes.filter(a => a.tipo === 'mensal');
   }, [apuracoes]);
@@ -490,10 +519,8 @@ export function useApuracoesFechadas() {
     return apuracoes.filter(a => a.status === 'finalizado');
   }, [apuracoes]);
 
-  // For users to see their own results
   const getMeusResultados = async (email: string): Promise<ApuracaoFechadaItem[]> => {
     try {
-      // First find the collaborator by email
       const { data: colaboradorData, error: colaboradorError } = await supabase
         .from('colaboradores')
         .select('id')
@@ -504,7 +531,6 @@ export function useApuracoesFechadas() {
         return [];
       }
 
-      // Fetch apuracao items for this collaborator
       const { data, error } = await supabase
         .from('apuracoes_fechadas_itens')
         .select(`

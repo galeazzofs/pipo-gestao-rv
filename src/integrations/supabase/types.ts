@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
-  }
   public: {
     Tables: {
       apuracao_itens: {
@@ -27,7 +22,6 @@ export type Database = {
           nf_liquido: number
           nome_ev: string | null
           operadora: string
-          produto: string
           status: string
           taxa: number | null
         }
@@ -385,45 +379,48 @@ export type Database = {
       ev_contracts: {
         Row: {
           atingimento: number
+          ativo: boolean | null
           cliente: string
           created_at: string | null
           created_by: string | null
           data_inicio: string
           id: string
+          meses_pagos_manual: number | null
           nome_ev: string
           operadora: string
           porte: string
           produto: string
           updated_at: string | null
-          meses_pagos_manual: number | null
         }
         Insert: {
           atingimento?: number
+          ativo?: boolean | null
           cliente: string
           created_at?: string | null
           created_by?: string | null
           data_inicio: string
           id?: string
+          meses_pagos_manual?: number | null
           nome_ev: string
           operadora: string
           porte: string
           produto: string
           updated_at?: string | null
-          meses_pagos_manual: number | null
         }
         Update: {
           atingimento?: number
+          ativo?: boolean | null
           cliente?: string
           created_at?: string | null
           created_by?: string | null
           data_inicio?: string
           id?: string
+          meses_pagos_manual?: number | null
           nome_ev?: string
           operadora?: string
           porte?: string
           produto?: string
           updated_at?: string | null
-          meses_pagos_manual: number | null
         }
         Relationships: []
       }

@@ -64,7 +64,7 @@ interface CNRow {
 }
 
 export default function ApuracaoMensal() {
-  const { colaboradores, isLoading: loadingColaboradores, getCNs } = useColaboradores();
+  const { colaboradores, metasMensais, isLoading: loadingColaboradores, getCNs } = useColaboradores();
   const { saveApuracao, saveDraft, loadDraft, isLoading: loadingApuracoes } = useApuracoesFechadas();
   
   const currentDate = new Date();
@@ -84,6 +84,7 @@ export default function ApuracaoMensal() {
   const [rows, setRows] = useState<Record<string, Omit<CNRow, 'colaboradorId' | 'nome' | 'nivel' | 'target'>>>({});
 
   const mesReferencia = `${mes.slice(0, 3)}/${ano}`;
+  const mesIndex = MESES.indexOf(mes);
 
   // Função para carregar rascunho existente
   const loadExistingDraft = useCallback(async () => {
@@ -130,7 +131,7 @@ export default function ApuracaoMensal() {
     }
   }, [mes, ano, loadingColaboradores]);
 
-  // Inicializar rows com dados da Gestão de Time (Metas Automáticas)
+  // Inicializar rows com AUTOMATIZAÇÃO DE METAS
   useEffect(() => {
     if (loadingColaboradores || isLoadingDraft || draftId) return;
 
@@ -138,18 +139,33 @@ export default function ApuracaoMensal() {
     let hasChanges = false;
 
     cns.forEach(cn => {
-      // Se a linha ainda não existe no estado local
+      // Se a linha ainda não existe no estado, inicializa
       if (!rows[cn.id]) {
+        // 1. Busca Meta SAO (Específica do Mês ou Padrão)
+        const metaMensalEspecifica = metasMensais.find(
+          m => m.colaborador_id === cn.id && m.mes === mesIndex && m.ano === parseInt(ano)
+        );
+        const metaSaoValor = metaMensalEspecifica ? metaMensalEspecifica.meta_sao : (cn.meta_sao || 0);
+
+        // 2. Calcula Meta Vidas (Baseado no Porte)
+        let metaVidasValor = 0;
+        if (metaSaoValor > 0 && cn.porte) {
+          if (cn.porte === 'M') metaVidasValor = metaSaoValor * 350;
+          else if (cn.porte === 'G+') metaVidasValor = metaSaoValor * 1500;
+        } else {
+          metaVidasValor = cn.meta_vidas || 0;
+        }
+
         newRows[cn.id] = {
-          // AQUI ESTÁ A MUDANÇA: Puxa meta_sao e meta_vidas do cadastro do colaborador
-          saoMeta: cn.meta_sao?.toString() || '', 
-          saoRealizado: '', 
-          vidasMeta: cn.meta_vidas?.toString() || '', 
+          saoMeta: metaSaoValor > 0 ? metaSaoValor.toString() : '',
+          saoRealizado: '',
+          vidasMeta: metaVidasValor > 0 ? metaVidasValor.toString() : '',
           vidasRealizado: '',
           comissao: 0, pctSAO: 0, pctVidas: 0, scoreFinal: 0, multiplicador: 0,
         };
         hasChanges = true;
       } else {
+        // Mantém o estado atual se já existe (para não sobrescrever digitação manual em andamento)
         newRows[cn.id] = rows[cn.id];
       }
     });
@@ -157,7 +173,7 @@ export default function ApuracaoMensal() {
     if (hasChanges) {
       setRows(prev => ({ ...prev, ...newRows }));
     }
-  }, [cns, loadingColaboradores, isLoadingDraft, draftId, rows]);
+  }, [cns, metasMensais, mesIndex, ano, loadingColaboradores, isLoadingDraft, draftId, rows]);
 
   const updateRow = (colaboradorId: string, field: keyof CNRow, value: string) => {
     setRows(prev => {
@@ -205,7 +221,6 @@ export default function ApuracaoMensal() {
     return `${(value * 100).toFixed(1)}%`;
   };
 
-  // Constrói o array de itens para salvar (usado tanto para Rascunho quanto Finalizar)
   const buildItensArray = (onlyComplete = true): ApuracaoItemInput[] => {
     const itens: ApuracaoItemInput[] = [];
 
@@ -216,7 +231,6 @@ export default function ApuracaoMensal() {
       const isComplete = row.saoMeta !== '' && row.saoRealizado !== '' && row.vidasMeta !== '' && row.vidasRealizado !== '';
       const hasAnyData = row.saoMeta || row.saoRealizado || row.vidasMeta || row.vidasRealizado;
 
-      // Para finalizar, exige completo. Para rascunho, basta ter algum dado.
       if ((onlyComplete && isComplete) || (!onlyComplete && hasAnyData)) {
         itens.push({
           colaborador_id: cn.id,
@@ -238,17 +252,14 @@ export default function ApuracaoMensal() {
   };
 
   const handleSaveDraft = async () => {
-    const itens = buildItensArray(false); // Permite dados parciais
-    
+    const itens = buildItensArray(false);
     if (itens.length === 0) {
       toast.error('Preencha algum dado para salvar rascunho');
       return;
     }
-
     setIsSavingDraft(true);
     const result = await saveDraft('mensal', mesReferencia, itens);
     setIsSavingDraft(false);
-
     if (result) {
       setDraftId(result);
       setLastSaved(new Date());
@@ -256,19 +267,15 @@ export default function ApuracaoMensal() {
   };
 
   const handleFinalize = async () => {
-    const itens = buildItensArray(true); // Exige dados completos para os itens incluídos
-
+    const itens = buildItensArray(true);
     if (itens.length === 0) {
       toast.error('Nenhum CN com dados completos para finalizar');
       return;
     }
-
     setIsSaving(true);
     const result = await saveApuracao('mensal', mesReferencia, itens);
     setIsSaving(false);
-
     if (result) {
-      // Limpar formulário após finalizar
       const clearedRows: Record<string, any> = {};
       cns.forEach(cn => {
         clearedRows[cn.id] = {
@@ -290,7 +297,6 @@ export default function ApuracaoMensal() {
         <Navbar />
         
         <div className="max-w-7xl mx-auto px-4 py-8">
-          {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center">
@@ -328,7 +334,6 @@ export default function ApuracaoMensal() {
             </div>
           </div>
 
-          {/* Draft Status */}
           {(draftId || lastSaved) && (
             <div className="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 flex items-center gap-2">
               <Clock className="w-4 h-4 text-amber-600" />
@@ -341,18 +346,16 @@ export default function ApuracaoMensal() {
             </div>
           )}
 
-          {/* Info Card */}
           <div className="card-premium p-4 mb-6 flex items-start gap-3 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
             <Info className="w-5 h-5 text-blue-600 mt-0.5" />
             <div className="text-sm">
-              <p className="font-medium text-blue-800 dark:text-blue-300">Regra de Cálculo (Regra de Ouro)</p>
+              <p className="font-medium text-blue-800 dark:text-blue-300">Automação de Metas</p>
               <p className="text-blue-700 dark:text-blue-400">
-                Score = (SAO × 70%) + (Vidas × 30%, trava em 150%). Metas carregadas da Gestão de Time.
+                Meta SAO puxada do mês/ano. Meta Vidas calculada automaticamente pelo Porte (M=350x, G+=1500x).
               </p>
             </div>
           </div>
 
-          {/* Table */}
           <div className="card-premium overflow-hidden mb-6">
             {loadingColaboradores || isLoadingDraft ? (
               <div className="flex items-center justify-center py-12">
@@ -377,17 +380,7 @@ export default function ApuracaoMensal() {
                       <TableHead className="text-center w-24">Real SAO</TableHead>
                       <TableHead className="text-center w-24">Meta Vidas</TableHead>
                       <TableHead className="text-center w-24">Real Vidas</TableHead>
-                      <TableHead className="text-center">
-                        <Tooltip>
-                          <TooltipTrigger className="flex items-center gap-1 justify-center">
-                            Score
-                            <Info className="w-3 h-3" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>(SAO × 70%) + (Vidas × 30%)</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TableHead>
+                      <TableHead className="text-center">Score</TableHead>
                       <TableHead className="text-center">Mult.</TableHead>
                       <TableHead className="text-right">Comissão</TableHead>
                     </TableRow>
@@ -407,13 +400,14 @@ export default function ApuracaoMensal() {
                         };
                         const nivel = (cn.nivel || 'CN1') as CNLevel;
                         const target = CN_TARGETS[nivel];
-                        
-                        // Verifica se todos os campos estão preenchidos (diferente de string vazia)
                         const isComplete = row.saoMeta !== '' && row.saoRealizado !== '' && row.vidasMeta !== '' && row.vidasRealizado !== '';
 
                         return (
                           <TableRow key={cn.id}>
-                            <TableCell className="font-medium">{cn.nome}</TableCell>
+                            <TableCell className="font-medium">
+                              {cn.nome}
+                              {cn.porte && <Badge variant="secondary" className="ml-2 text-[10px] h-5">{cn.porte}</Badge>}
+                            </TableCell>
                             <TableCell className="text-center">
                               <Badge variant="outline">{nivel}</Badge>
                             </TableCell>
@@ -427,7 +421,8 @@ export default function ApuracaoMensal() {
                                 placeholder="0"
                                 value={row.saoMeta}
                                 onChange={(e) => updateRow(cn.id, 'saoMeta', e.target.value)}
-                                className="w-20 text-center"
+                                className="w-20 text-center bg-muted/20"
+                                title="Puxado automaticamente"
                               />
                             </TableCell>
                             <TableCell>
@@ -447,7 +442,8 @@ export default function ApuracaoMensal() {
                                 placeholder="0"
                                 value={row.vidasMeta}
                                 onChange={(e) => updateRow(cn.id, 'vidasMeta', e.target.value)}
-                                className="w-20 text-center"
+                                className="w-20 text-center bg-muted/20"
+                                title="Calculado automaticamente"
                               />
                             </TableCell>
                             <TableCell>
@@ -478,7 +474,6 @@ export default function ApuracaoMensal() {
             )}
           </div>
 
-          {/* Footer Actions */}
           {cns.length > 0 && (
             <div className="card-premium p-6 sticky bottom-4 z-10 shadow-lg border-t bg-background/95 backdrop-blur">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -499,11 +494,7 @@ export default function ApuracaoMensal() {
                     disabled={isSavingDraft || !hasAnyData}
                     className="gap-2"
                   >
-                    {isSavingDraft ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Save className="w-4 h-4" />
-                    )}
+                    {isSavingDraft ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     Salvar Rascunho
                   </Button>
 
@@ -512,11 +503,7 @@ export default function ApuracaoMensal() {
                     disabled={isSaving || totalComissoes === 0}
                     className="gap-2"
                   >
-                    {isSaving ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <FileCheck className="w-4 h-4" />
-                    )}
+                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCheck className="w-4 h-4" />}
                     Finalizar Fechamento
                   </Button>
                 </div>

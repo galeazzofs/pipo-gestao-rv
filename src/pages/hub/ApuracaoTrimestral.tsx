@@ -896,6 +896,9 @@ export default function ApuracaoTrimestral() {
                             const nivel = (cn.nivel || 'CN1') as CNLevel;
                             const target = CN_TARGETS[nivel];
 
+                            // Verifica se todos os inputs estão preenchidos
+                            const isComplete = row.saoMeta !== '' && row.saoRealizado !== '' && row.vidasMeta !== '' && row.vidasRealizado !== '';
+
                             return (
                               <TableRow key={cn.id}>
                                 <TableCell className="font-medium">{cn.nome}</TableCell>
@@ -946,13 +949,13 @@ export default function ApuracaoTrimestral() {
                                   />
                                 </TableCell>
                                 <TableCell className="text-center font-medium">
-                                  {row.scoreFinal ? formatPercentage(row.scoreFinal) : '-'}
+                                  {isComplete ? formatPercentage(row.scoreFinal) : '-'}
                                 </TableCell>
                                 <TableCell className="text-center">
-                                  {row.multiplicador ? formatPercentage(row.multiplicador) : '-'}
+                                  {isComplete ? formatPercentage(row.multiplicador) : '-'}
                                 </TableCell>
                                 <TableCell className="text-right font-medium">
-                                  {row.comissao ? formatCurrency(row.comissao) : '-'}
+                                  {isComplete ? formatCurrency(row.comissao) : '-'}
                                 </TableCell>
                                 <TableCell>
                                   <Input
@@ -965,7 +968,7 @@ export default function ApuracaoTrimestral() {
                                   />
                                 </TableCell>
                                 <TableCell className="text-right font-bold text-emerald-600 dark:text-emerald-400">
-                                  {row.total ? formatCurrency(row.total) : '-'}
+                                  {(isComplete || row.total > 0) ? formatCurrency(row.total) : '-'}
                                 </TableCell>
                               </TableRow>
                             );
@@ -1074,6 +1077,9 @@ export default function ApuracaoTrimestral() {
                               comissaoSafra: 0, metaMRR: '', mrrRealizado: '', 
                               pctAtingimento: 0, multiplicador: 0, bonusEV: 0, total: 0 
                             };
+                            
+                            // Verifica se há dados de meta/realizado para exibir %
+                            const hasMetaMRR = row.metaMRR !== '' && row.mrrRealizado !== '';
 
                             return (
                               <TableRow key={ev.id}>
@@ -1126,7 +1132,7 @@ export default function ApuracaoTrimestral() {
                                       row.pctAtingimento > 0 ? "text-red-600 dark:text-red-400" :
                                       "text-muted-foreground"
                                     )}>
-                                      {row.pctAtingimento > 0 ? `${row.pctAtingimento.toFixed(1)}%` : '-'}
+                                      {hasMetaMRR ? `${row.pctAtingimento.toFixed(1)}%` : '-'}
                                     </span>
                                   </div>
                                 </TableCell>
@@ -1313,6 +1319,8 @@ export default function ApuracaoTrimestral() {
                             };
                             
                             const hasNoEvs = evsDoTime.length === 0;
+                            // Verifica se os campos estão preenchidos para mostrar o resultado
+                            const hasValues = row.metaSQL !== '' && row.realizadoMRR !== '' && row.realizadoSQL !== '' && row.metaMRRCalculada > 0;
 
                             return (
                               <TableRow key={lider.id} className={hasNoEvs ? 'opacity-60' : ''}>
@@ -1387,7 +1395,7 @@ export default function ApuracaoTrimestral() {
                                     row.pctMRR > 0 ? "text-red-600 dark:text-red-400" :
                                     "text-muted-foreground"
                                   )}>
-                                    {row.pctMRR > 0 ? `${row.pctMRR.toFixed(1)}%` : '-'}
+                                    {hasValues ? `${row.pctMRR.toFixed(1)}%` : '-'}
                                   </span>
                                 </TableCell>
                                 <TableCell className="text-center">
@@ -1399,7 +1407,7 @@ export default function ApuracaoTrimestral() {
                                     row.pctSQL > 0 ? "text-red-600 dark:text-red-400" :
                                     "text-muted-foreground"
                                   )}>
-                                    {row.pctSQL > 0 ? `${row.pctSQL.toFixed(1)}%` : '-'}
+                                    {hasValues ? `${row.pctSQL.toFixed(1)}%` : '-'}
                                   </span>
                                 </TableCell>
                                 <TableCell className="text-center">

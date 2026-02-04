@@ -291,6 +291,8 @@ export type Database = {
           nome: string
           salario_base: number | null
           updated_at: string | null
+          porte: string | null
+          data_admissao: string | null
         }
         Insert: {
           ativo?: boolean | null
@@ -307,6 +309,8 @@ export type Database = {
           nome: string
           salario_base?: number | null
           updated_at?: string | null
+          porte?: string | null
+          data_admissao?: string | null
         }
         Update: {
           ativo?: boolean | null
@@ -323,6 +327,8 @@ export type Database = {
           nome?: string
           salario_base?: number | null
           updated_at?: string | null
+          porte?: string | null
+          data_admissao?: string | null
         }
         Relationships: [
           {
@@ -423,6 +429,44 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      metas_sao_mensais: {
+        Row: {
+          id: string
+          colaborador_id: string
+          mes: number
+          ano: number
+          meta_sao: number
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          colaborador_id: string
+          mes: number
+          ano: number
+          meta_sao: number
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          colaborador_id?: string
+          mes?: number
+          ano?: number
+          meta_sao?: number
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metas_sao_mensais_colaborador_id_fkey"
+            columns: ["colaborador_id"]
+            isOneToOne: false
+            referencedRelation: "colaboradores"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       profiles: {
         Row: {

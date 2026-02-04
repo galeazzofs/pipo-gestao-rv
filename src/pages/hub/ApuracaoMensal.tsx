@@ -130,7 +130,7 @@ export default function ApuracaoMensal() {
     }
   }, [mes, ano, loadingColaboradores]);
 
-  // Inicializar rows vazias se não houver rascunho (apenas para garantir estrutura)
+  // Inicializar rows com dados da Gestão de Time (Metas Automáticas)
   useEffect(() => {
     if (loadingColaboradores || isLoadingDraft || draftId) return;
 
@@ -138,9 +138,14 @@ export default function ApuracaoMensal() {
     let hasChanges = false;
 
     cns.forEach(cn => {
+      // Se a linha ainda não existe no estado local
       if (!rows[cn.id]) {
         newRows[cn.id] = {
-          saoMeta: '', saoRealizado: '', vidasMeta: '', vidasRealizado: '',
+          // AQUI ESTÁ A MUDANÇA: Puxa meta_sao e meta_vidas do cadastro do colaborador
+          saoMeta: cn.meta_sao?.toString() || '', 
+          saoRealizado: '', 
+          vidasMeta: cn.meta_vidas?.toString() || '', 
+          vidasRealizado: '',
           comissao: 0, pctSAO: 0, pctVidas: 0, scoreFinal: 0, multiplicador: 0,
         };
         hasChanges = true;
@@ -150,7 +155,7 @@ export default function ApuracaoMensal() {
     });
 
     if (hasChanges) {
-      setRows(newRows);
+      setRows(prev => ({ ...prev, ...newRows }));
     }
   }, [cns, loadingColaboradores, isLoadingDraft, draftId, rows]);
 
@@ -208,7 +213,7 @@ export default function ApuracaoMensal() {
       const row = rows[cn.id];
       if (!row) return;
 
-      const isComplete = row.saoMeta && row.saoRealizado && row.vidasMeta && row.vidasRealizado;
+      const isComplete = row.saoMeta !== '' && row.saoRealizado !== '' && row.vidasMeta !== '' && row.vidasRealizado !== '';
       const hasAnyData = row.saoMeta || row.saoRealizado || row.vidasMeta || row.vidasRealizado;
 
       // Para finalizar, exige completo. Para rascunho, basta ter algum dado.
@@ -342,7 +347,7 @@ export default function ApuracaoMensal() {
             <div className="text-sm">
               <p className="font-medium text-blue-800 dark:text-blue-300">Regra de Cálculo (Regra de Ouro)</p>
               <p className="text-blue-700 dark:text-blue-400">
-                Score = (SAO × 70%) + (Vidas × 30%, trava em 150%). Multiplicador aplicado conforme régua de payout.
+                Score = (SAO × 70%) + (Vidas × 30%, trava em 150%). Metas carregadas da Gestão de Time.
               </p>
             </div>
           </div>
@@ -402,6 +407,9 @@ export default function ApuracaoMensal() {
                         };
                         const nivel = (cn.nivel || 'CN1') as CNLevel;
                         const target = CN_TARGETS[nivel];
+                        
+                        // Verifica se todos os campos estão preenchidos (diferente de string vazia)
+                        const isComplete = row.saoMeta !== '' && row.saoRealizado !== '' && row.vidasMeta !== '' && row.vidasRealizado !== '';
 
                         return (
                           <TableRow key={cn.id}>
@@ -453,13 +461,13 @@ export default function ApuracaoMensal() {
                               />
                             </TableCell>
                             <TableCell className="text-center font-medium">
-                              {row.scoreFinal ? formatPercentage(row.scoreFinal) : '-'}
+                              {isComplete ? formatPercentage(row.scoreFinal) : '-'}
                             </TableCell>
                             <TableCell className="text-center">
-                              {row.multiplicador ? formatPercentage(row.multiplicador) : '-'}
+                              {isComplete ? formatPercentage(row.multiplicador) : '-'}
                             </TableCell>
                             <TableCell className="text-right font-bold text-success">
-                              {row.comissao ? formatCurrency(row.comissao) : '-'}
+                              {isComplete ? formatCurrency(row.comissao) : '-'}
                             </TableCell>
                           </TableRow>
                         );

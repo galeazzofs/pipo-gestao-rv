@@ -148,14 +148,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(newSession?.user ?? null);
 
         if (newSession?.user) {
-          // Use setTimeout to avoid potential race conditions
-          setTimeout(async () => {
-            const userProfile = await fetchProfile(newSession.user.id);
-            setProfile(userProfile);
-            const adminStatus = await checkAdminRole(newSession.user.id);
-            setIsAdmin(adminStatus);
-            setLoading(false);
-          }, 0);
+          const [userProfile, adminStatus] = await Promise.all([
+            fetchProfile(newSession.user.id),
+            checkAdminRole(newSession.user.id),
+          ]);
+          setProfile(userProfile);
+          setIsAdmin(adminStatus);
+          setLoading(false);
         } else {
           setProfile(null);
           setIsAdmin(false);

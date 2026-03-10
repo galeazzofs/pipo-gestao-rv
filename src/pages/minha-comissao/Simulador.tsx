@@ -3,22 +3,17 @@ import { Navbar } from '@/components/Navbar';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { MetricInputGroup } from '@/components/MetricInputGroup';
 import { ResultDisplay } from '@/components/ResultDisplay';
-import { calcularComissaoCN, CNLevel, CN_TARGETS, getFaixaPagamento, formatPorcentagem } from '@/lib/cnCalculations';
+import { calcularComissaoCN, CNLevel, getFaixaPagamento, formatPorcentagem } from '@/lib/cnCalculations';
 import { useAuth } from '@/contexts/AuthContext';
-import { useColaboradores } from '@/hooks/useColaboradores';
+import { useCurrentColaborador } from '@/hooks/useCurrentColaborador';
 import { Badge } from '@/components/ui/badge';
 import { Calculator, Info, AlertCircle, Loader2, User } from 'lucide-react';
-import { Link } from 'react-router-dom';
 
 export default function Simulador() {
   const { user } = useAuth();
-  const { colaboradores, isLoading: loadingColaborador } = useColaboradores();
-  
-  // Buscar colaborador pelo email do usuário logado
-  const colaborador = colaboradores.find(c => c.email === user?.email);
+  const { colaborador, isLoading: loadingColaborador } = useCurrentColaborador();
   const nivel = (colaborador?.nivel as CNLevel) || 'CN1';
   const nome = colaborador?.nome || 'Usuário';
-  const target = CN_TARGETS[nivel];
   const isRegistered = !!colaborador;
   
   const [saoMeta, setSaoMeta] = useState<string>('');
@@ -52,13 +47,6 @@ export default function Simulador() {
     saoRealizado !== '' && 
     vidasMeta !== '' && 
     vidasRealizado !== '';
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
 
   return (
     <ProtectedRoute>

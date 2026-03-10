@@ -55,10 +55,12 @@ export function useForecast() {
 
       const ultimaApuracaoId = ultimaApuracao?.id;
 
-      // 2. Buscar histórico de pagamentos REALIZADOS (nova tabela)
+      // 2. Buscar histórico de pagamentos REALIZADOS (filtrado pelos contratos atuais)
+      const contractIds = contracts.map(c => c.id);
       const { data: payments, error: paymentsError } = await supabase
         .from('contract_payments')
         .select('contract_id, valor_pago, data_parcela, apuracao_id')
+        .in('contract_id', contractIds)
         .order('data_parcela', { ascending: true });
 
       if (paymentsError) throw paymentsError;

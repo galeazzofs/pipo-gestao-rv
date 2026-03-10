@@ -3,6 +3,7 @@ import { Navbar } from '@/components/Navbar';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { useApuracoesFechadas } from '@/hooks/useApuracoesFechadas';
+import { formatCurrency } from '@/lib/formatters';
 import {
   Table,
   TableBody,
@@ -56,13 +57,6 @@ export default function MeusResultados() {
 
     fetchResultados();
   }, [profile?.email]);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('pt-BR', {

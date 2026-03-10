@@ -102,19 +102,31 @@ export function useColaboradores() {
 
   const addColaborador = async (input: ColaboradorInput): Promise<boolean> => {
     try {
-      // Prepara o payload convertendo inputs vazios para null ou zero conforme necessário
-      const payload: any = {
+      interface ColaboradorPayload {
+        nome: string;
+        email: string;
+        cargo: Cargo;
+        nivel: string | null;
+        porte: Porte | null;
+        lider_id: string | null;
+        salario_base: number;
+        meta_sao: number;
+        meta_vidas: number;
+        meta_mrr: number;
+        ativo: boolean;
+      }
+      const payload: ColaboradorPayload = {
         nome: input.nome,
         email: input.email,
         cargo: input.cargo,
         nivel: input.cargo === 'CN' ? input.nivel : null,
-        porte: input.cargo === 'CN' ? input.porte : null,
+        porte: input.cargo === 'CN' ? (input.porte ?? null) : null,
         lider_id: input.lider_id || null,
         salario_base: input.salario_base || 0,
         meta_sao: input.meta_sao || 0,
         meta_vidas: input.meta_vidas || 0,
         meta_mrr: input.meta_mrr || 0,
-        ativo: true
+        ativo: true,
       };
 
       const { error } = await supabase.from('colaboradores').insert([payload]);
@@ -135,7 +147,7 @@ export function useColaboradores() {
     try {
       const { error } = await supabase
         .from('colaboradores')
-        .update(input as any)
+        .update(input)
         .eq('id', id);
 
       if (error) throw error;

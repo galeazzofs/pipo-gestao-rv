@@ -56,10 +56,5 @@ export function getTaxa(porte: Porte, atingimento: number): number {
   return MATRIZ_TAXAS[porte]?.[faixa] ?? 0;
 }
 
-export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-}
-
-export function formatPercent(value: number): string {
-  return `${(value * 100).toFixed(1)}%`;
-}
+// Funções centralizadas em formatters.ts e re-exportadas aqui para compatibilidade
+export { formatCurrency, formatPercent, formatPercentage } from './formatters';

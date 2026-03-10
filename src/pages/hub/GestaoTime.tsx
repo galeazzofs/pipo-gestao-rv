@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { AdminRoute } from '@/components/AdminRoute';
 import { useColaboradores, Cargo, Colaborador, Porte } from '@/hooks/useColaboradores';
+import { ColaboradorCard } from '@/components/hub/ColaboradorCard';
+import { MetasMensaisDialog } from '@/components/hub/MetasMensaisDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,46 +20,20 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
 } from '@/components/ui/dialog';
+import { Card } from '@/components/ui/card';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Plus, 
-  Pencil, 
-  Trash2, 
-  Users, 
+  Plus,
+  Users,
   Search,
   Loader2,
   Download,
   Store,
   Gem,
   UserCog,
-  TrendingUp,
   LayoutGrid,
   List as ListIcon,
-  Target // Ícone para o botão de Metas
 } from 'lucide-react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 // Importe o supabase client se estiver usando diretamente, ou confie no hook se ele já expõe add/update
 import { supabase } from '@/integrations/supabase/client';
@@ -69,7 +45,6 @@ const CARGOS: { value: Cargo; label: string }[] = [
 ];
 
 const NIVEIS = ['CN1', 'CN2', 'CN3'];
-const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
 interface FormData {
   nome: string;
@@ -112,11 +87,6 @@ export default function GestaoTime() {
   // Estados do Diálogo de Metas Mensais
   const [isMetasDialogOpen, setIsMetasDialogOpen] = useState(false);
   const [selectedCNForMetas, setSelectedCNForMetas] = useState<Colaborador | null>(null);
-  const [metaMensalData, setMetaMensalData] = useState({
-    mes: new Date().getMonth().toString(),
-    ano: new Date().getFullYear().toString(),
-    meta_sao: ''
-  });
 
   const lideres = getLideres();
 
@@ -205,51 +175,6 @@ export default function GestaoTime() {
     }
   };
 
-  // Lógica para salvar a meta mensal específica
-  const handleSaveMetaMensal = async () => {
-    if (!selectedCNForMetas || !metaMensalData.meta_sao) {
-        toast.error('Preencha a meta de SAO');
-        return;
-    }
-    
-    const success = await saveMetaMensal(
-      selectedCNForMetas.id,
-      parseInt(metaMensalData.mes),
-      parseInt(metaMensalData.ano),
-      parseFloat(metaMensalData.meta_sao)
-    );
-    
-    if(success) {
-        setMetaMensalData(prev => ({ ...prev, meta_sao: '' })); // Limpa o campo após salvar
-    }
-  };
-
-  const getInitials = (name: string) => {
-    return name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase();
-  };
-
-  const getRoleBadgeColor = (cargo: Cargo) => {
-    switch (cargo) {
-      case 'CN': return 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-800';
-      case 'EV': return 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800';
-      case 'Lideranca': return 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800';
-      default: return 'bg-gray-100 text-gray-700 border-gray-200';
-    }
-  };
-
-  const getAvatarColor = (cargo: Cargo) => {
-    switch (cargo) {
-      case 'CN': return 'bg-teal-100 text-teal-600 dark:bg-teal-900/50 dark:text-teal-400';
-      case 'EV': return 'bg-purple-100 text-purple-600 dark:bg-purple-900/50 dark:text-purple-400';
-      case 'Lideranca': return 'bg-orange-100 text-orange-600 dark:bg-orange-900/50 dark:text-orange-400';
-      default: return 'bg-gray-100 text-gray-600';
-    }
-  };
-
-  // Filtra as metas mensais para exibir apenas as do CN selecionado no diálogo
-  const metasDoCN = selectedCNForMetas 
-  ? metasMensais.filter(m => m.colaborador_id === selectedCNForMetas.id).sort((a,b) => (b.ano * 100 + b.mes) - (a.ano * 100 + a.mes))
-  : [];
 
   return (
     <AdminRoute>
@@ -449,78 +374,13 @@ export default function GestaoTime() {
           </div>
 
           {/* Dialog de Gerenciamento de Metas Mensais */}
-          <Dialog open={isMetasDialogOpen} onOpenChange={setIsMetasDialogOpen}>
-            <DialogContent className="max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>Metas Mensais: {selectedCNForMetas?.nome}</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-2">
-                    <p className="text-sm text-muted-foreground">
-                        Defina metas de SAO específicas para cada mês. A meta de Vidas será calculada automaticamente baseada no Porte ({selectedCNForMetas?.porte || 'Indefinido'}).
-                    </p>
-                    
-                    {/* Formulário de Adição de Meta */}
-                    <div className="flex gap-2 items-end p-3 bg-muted/30 rounded-lg border">
-                        <div className="flex-1">
-                            <Label className="text-xs mb-1.5 block">Mês</Label>
-                            <Select value={metaMensalData.mes} onValueChange={v => setMetaMensalData({...metaMensalData, mes: v})}>
-                                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    {MESES.map((m, i) => <SelectItem key={i} value={i.toString()}>{m}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="w-20">
-                            <Label className="text-xs mb-1.5 block">Ano</Label>
-                            <Input className="h-9" type="number" value={metaMensalData.ano} onChange={e => setMetaMensalData({...metaMensalData, ano: e.target.value})} />
-                        </div>
-                        <div className="w-24">
-                            <Label className="text-xs mb-1.5 block">Meta SAO</Label>
-                            <Input className="h-9" type="number" placeholder="0" value={metaMensalData.meta_sao} onChange={e => setMetaMensalData({...metaMensalData, meta_sao: e.target.value})} />
-                        </div>
-                        <Button size="icon" className="h-9 w-9 shrink-0" onClick={handleSaveMetaMensal}>
-                            <Plus className="w-4 h-4" />
-                        </Button>
-                    </div>
-
-                    {/* Lista de Metas Cadastradas */}
-                    <div className="border rounded-md max-h-60 overflow-y-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow className="hover:bg-transparent">
-                                    <TableHead className="h-9">Mês/Ano</TableHead>
-                                    <TableHead className="h-9">Meta SAO</TableHead>
-                                    <TableHead className="h-9 text-right">Meta Vidas (Est.)</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {metasDoCN.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={3} className="text-center text-muted-foreground py-4 text-sm">
-                                            Nenhuma meta específica cadastrada.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    metasDoCN.map(meta => {
-                                        // Exibe uma estimativa visual da meta de vidas
-                                        const multiplicador = selectedCNForMetas?.porte === 'G+' ? 1500 : 350;
-                                        return (
-                                            <TableRow key={meta.id}>
-                                                <TableCell className="py-2">{MESES[meta.mes]}/{meta.ano}</TableCell>
-                                                <TableCell className="py-2 font-medium">{meta.meta_sao}</TableCell>
-                                                <TableCell className="py-2 text-right text-muted-foreground">
-                                                    {(meta.meta_sao * multiplicador).toLocaleString()}
-                                                </TableCell>
-                                            </TableRow>
-                                        )
-                                    })
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </div>
-            </DialogContent>
-          </Dialog>
+          <MetasMensaisDialog
+            isOpen={isMetasDialogOpen}
+            onOpenChange={setIsMetasDialogOpen}
+            selectedCN={selectedCNForMetas}
+            metasMensais={metasMensais}
+            onSave={saveMetaMensal}
+          />
 
           {/* Cards de Estatísticas */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
@@ -622,136 +482,19 @@ export default function GestaoTime() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
-              {filteredColaboradores.map((colaborador) => {
-                const lider = colaboradores.find(c => c.id === colaborador.lider_id);
-                
-                return (
-                  <Card key={colaborador.id} className="group flex flex-col h-full hover:shadow-md transition-all duration-200 border-border">
-                    <div className="p-6 flex flex-col gap-4 flex-1">
-                      {/* Top Row */}
-                      <div className="flex justify-between items-start">
-                        <Avatar className={`h-14 w-14 border ${getAvatarColor(colaborador.cargo)} border-transparent`}>
-                          <AvatarFallback className="text-lg font-bold bg-transparent">
-                            {getInitials(colaborador.nome)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col items-end gap-1">
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${getRoleBadgeColor(colaborador.cargo)}`}>
-                              {colaborador.cargo === 'CN' ? colaborador.nivel : colaborador.cargo}
-                            </span>
-                            {/* Exibe o Porte no card se for CN */}
-                            {colaborador.cargo === 'CN' && colaborador.porte && (
-                                <span className="text-[10px] font-semibold text-muted-foreground border px-1.5 rounded bg-muted/30">
-                                    Porte {colaborador.porte}
-                                </span>
-                            )}
-                        </div>
-                      </div>
-
-                      {/* Info */}
-                      <div>
-                        <h3 className="font-bold text-foreground text-lg truncate">{colaborador.nome}</h3>
-                        <p className="text-sm text-muted-foreground truncate">{colaborador.email}</p>
-                      </div>
-
-                      {/* Leader Info */}
-                      <div className="p-3 bg-muted/50 rounded-lg flex items-center gap-3">
-                        <Avatar className="h-8 w-8 border border-border">
-                          <AvatarFallback className="text-[10px] bg-background">
-                            {lider ? getInitials(lider.nome) : '--'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col">
-                          <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wide">Líder</span>
-                          <span className="text-xs font-semibold text-foreground">
-                            {lider ? lider.nome.split(' ').slice(0, 2).join(' ') : 'Sem líder'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Metrics */}
-                      <div className="grid grid-cols-2 gap-4 pt-2 mt-auto">
-                        <div>
-                          <span className="text-xs text-muted-foreground block mb-0.5">Meta Principal</span>
-                          <span className="text-sm font-bold text-foreground">
-                            {colaborador.cargo === 'EV' && `MRR: R$ ${colaborador.meta_mrr}`}
-                            {colaborador.cargo === 'CN' && `SAO: ${colaborador.meta_sao}`}
-                            {colaborador.cargo === 'Lideranca' && 'Gestão'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-xs text-muted-foreground block mb-0.5">Performance</span>
-                          <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-sm font-bold">
-                            <TrendingUp className="w-4 h-4" />
-                            <span>--%</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Footer Actions */}
-                    <div className="px-6 py-4 border-t border-border flex items-center justify-between bg-muted/30 rounded-b-xl">
-                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium border ${colaborador.ativo ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900' : 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${colaborador.ativo ? 'bg-green-500' : 'bg-gray-400'}`}></span>
-                        {colaborador.ativo ? 'Ativo' : 'Inativo'}
-                      </span>
-                      
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        
-                        {/* Botão para abrir o diálogo de Metas Mensais (Apenas para CN) */}
-                        {colaborador.cargo === 'CN' && (
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-background shadow-none"
-                                onClick={() => {
-                                    setSelectedCNForMetas(colaborador);
-                                    setIsMetasDialogOpen(true);
-                                }}
-                                title="Gerenciar Metas Mensais"
-                            >
-                                <Target className="w-4 h-4" />
-                            </Button>
-                        )}
-
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-background shadow-none"
-                          onClick={() => handleOpenEdit(colaborador)}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-background shadow-none"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Remover colaborador?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta ação não pode ser desfeita. O colaborador {colaborador.nome} será removido.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDelete(colaborador.id)} className="bg-destructive hover:bg-destructive/90">
-                                Remover
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
+              {filteredColaboradores.map((colaborador) => (
+                <ColaboradorCard
+                  key={colaborador.id}
+                  colaborador={colaborador}
+                  lider={colaboradores.find(c => c.id === colaborador.lider_id)}
+                  onEdit={handleOpenEdit}
+                  onDelete={handleDelete}
+                  onManageMetas={(cn) => {
+                    setSelectedCNForMetas(cn);
+                    setIsMetasDialogOpen(true);
+                  }}
+                />
+              ))}
             </div>
           )}
         </div>

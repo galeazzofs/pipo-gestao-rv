@@ -13,6 +13,7 @@ import { ExcelRow, formatCurrency as formatCurrencyEV, ProcessedResult } from '@
 import { ResultsDashboard } from '@/components/ev/ResultsDashboard';
 import { ResultsTable } from '@/components/ev/ResultsTable';
 import { getMultiplicadorLideranca, calcularMetaMRRLider } from '@/lib/leadershipCalculations';
+import { formatCurrency, formatPercentage } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -182,17 +183,6 @@ export default function ApuracaoTrimestral() {
   const [selectedEV, setSelectedEV] = useState('__all__');
 
   const mesReferencia = `${trimestre}/${ano}`;
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
-
-  const formatPercentage = (value: number) => {
-    return `${(value * 100).toFixed(1)}%`;
-  };
 
   // Helper: Get EVs subordinated to a leader
   const getEVsDoLider = useCallback((liderId: string): Colaborador[] => {

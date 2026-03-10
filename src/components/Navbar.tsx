@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useColaboradores } from "@/hooks/useColaboradores";
+import { useCurrentColaborador } from "@/hooks/useCurrentColaborador";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -51,12 +51,11 @@ const adminLinks: NavLinkItem[] = [
 
 export function Navbar() {
   const { user, profile, isAdmin, signOut } = useAuth();
-  const { colaboradores } = useColaboradores();
+  const { colaborador } = useCurrentColaborador();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Check if user is Liderança
-  const colaborador = colaboradores.find((c) => c.email === user?.email);
   const isLider = colaborador?.cargo === "Lideranca";
   const canAccessHub = isAdmin || isLider;
 

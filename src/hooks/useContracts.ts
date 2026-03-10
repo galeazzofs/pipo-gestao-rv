@@ -120,8 +120,18 @@ export function useContracts() {
 
   const updateContract = useCallback(async (id: string, updates: Partial<Omit<Contract, 'id'>>) => {
     try {
-      const updateData: Record<string, any> = {};
-      
+      interface EVContractUpdate {
+        nome_ev?: string;
+        cliente?: string;
+        produto?: string;
+        operadora?: string;
+        porte?: Porte;
+        atingimento?: number;
+        data_inicio?: string;
+        meses_pagos_manual?: number;
+      }
+      const updateData: EVContractUpdate = {};
+
       if (updates.nomeEV !== undefined) updateData.nome_ev = updates.nomeEV;
       if (updates.cliente !== undefined) updateData.cliente = updates.cliente;
       if (updates.produto !== undefined) updateData.produto = updates.produto;
@@ -133,9 +143,7 @@ export function useContracts() {
 
       const { error } = await supabase
         .from('ev_contracts')
-        // O uso de 'as any' aqui resolve o erro de tipagem estrita do TypeScript
-        // garantindo que o objeto seja aceito mesmo se a definição de tipos estiver rígida
-        .update(updateData as any)
+        .update(updateData)
         .eq('id', id);
 
       if (error) {

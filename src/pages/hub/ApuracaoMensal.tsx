@@ -39,13 +39,8 @@ import {
 } from '@/components/ui/tooltip';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
-const MESES = [
-  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-];
-
-const ANOS = ['2024', '2025', '2026', '2027'];
+import { MESES, ANOS } from '@/lib/constants';
+import { formatCurrency, formatPercentage } from '@/lib/formatters';
 
 interface CNRow {
   colaboradorId: string;
@@ -129,7 +124,7 @@ export default function ApuracaoMensal() {
     if (!loadingColaboradores) {
       loadExistingDraft();
     }
-  }, [mes, ano, loadingColaboradores]);
+  }, [mes, ano, loadingColaboradores, loadExistingDraft]);
 
   // Inicializar rows com AUTOMATIZAÇÃO DE METAS
   useEffect(() => {
@@ -209,17 +204,6 @@ export default function ApuracaoMensal() {
   const totalComissoes = useMemo(() => {
     return Object.values(rows).reduce((sum, row) => sum + (row.comissao || 0), 0);
   }, [rows]);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
-
-  const formatPercentage = (value: number) => {
-    return `${(value * 100).toFixed(1)}%`;
-  };
 
   const buildItensArray = (onlyComplete = true): ApuracaoItemInput[] => {
     const itens: ApuracaoItemInput[] = [];

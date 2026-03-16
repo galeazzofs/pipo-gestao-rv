@@ -83,29 +83,40 @@ The hook returns `draft` (`{ apuracao, itens } | null`) and `isDraftLoading` ins
 
 ### Draft hydration guard
 
-The `useEffect` that hydrates form state from `draft` must not overwrite user edits on every background refetch. Use a `useRef` to track the last hydrated draft ID:
+The `useEffect` that hydrates form state from `draft` must not overwrite user edits on every background refetch, but must reset them when the user changes trimestre/ano. Track both the active `mesReferencia` and the last hydrated draft ID via a `useRef`:
 
 ```ts
-const lastHydratedDraftId = useRef<string | null>(undefined);
+const lastHydratedKey = useRef<{ mesReferencia: string; draftId: string | null } | undefined>(undefined);
 
 useEffect(() => {
-  const incomingId = draft?.apuracao.id ?? null;
-  if (incomingId === lastHydratedDraftId.current) return; // same draft, skip
-  lastHydratedDraftId.current = incomingId;
-  // hydrate cnInputs, evResults, leadershipInputs from draft
-}, [draft]);
+  const incomingKey = { mesReferencia, draftId: draft?.apuracao.id ?? null };
+  const prev = lastHydratedKey.current;
+  // Skip if same quarter AND same draft — i.e., a background refetch with no change
+  if (prev && prev.mesReferencia === incomingKey.mesReferencia && prev.draftId === incomingKey.draftId) return;
+  lastHydratedKey.current = incomingKey;
+  // hydrate (or reset to empty) cnInputs, evResults, leadershipInputs from draft
+}, [draft, mesReferencia]);
 ```
 
-When the user changes trimestre/ano, the query key changes and `draft` becomes a new object with a different ID (or null), triggering hydration. Background refetches that return the same draft object return the same ID, so hydration is skipped and user edits are preserved.
+This handles all cases correctly:
+- **Quarter change, draft exists**: new `mesReferencia` + new `draftId` → hydrate from draft
+- **Quarter change, no draft**: new `mesReferencia`, `draftId` null → reset rows to empty (matching current behavior)
+- **Background refetch, same draft**: same `mesReferencia` + same `draftId` → skip, user edits preserved
+- **Background refetch, no draft**: same `mesReferencia`, `draftId` null both times → skip
 
 ### Write operations — useMutation
 
 `saveDraft` and `saveApuracao` both currently return `Promise<string | null>` (the new apuração ID). Both move to `useMutation`. Callers use `mutateAsync` (not `mutate`) so the returned ID and call-site side effects remain sequential. **All `mutateAsync` call sites must be wrapped in try/catch** — in React Query v5, `mutateAsync` throws on error even when `onError` is defined in the mutation config:
 
 ```ts
-// In hook
-const saveDraftMutation = useMutation({
-  mutationFn: (args: SaveDraftArgs) => saveDraftFn(args),
+// mutationFn must throw on failure (not return null) so mutateAsync rejects correctly
+// and the resolved value is always the apuracao ID string
+const saveDraftMutation = useMutation<string, Error, SaveDraftArgs>({
+  mutationFn: async (args) => {
+    const id = await saveDraftFn(args);
+    if (!id) throw new Error('Erro ao salvar rascunho');
+    return id;
+  },
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['apuracoes'] });
     queryClient.invalidateQueries({ queryKey: ['draft', 'trimestral'] });
@@ -116,20 +127,28 @@ const saveDraftMutation = useMutation({
 
 // Hook return
 return {
-  saveDraft: saveDraftMutation.mutateAsync,
+  saveDraft: saveDraftMutation.mutateAsync,   // resolves to string ID on success, throws on failure
   isSavingDraft: saveDraftMutation.isPending,
   saveApuracao: saveApuracaoMutation.mutateAsync,
   isSaving: saveApuracaoMutation.isPending,
 };
 
-// In orchestrator — wrapped in try/catch; setLastSaved for both save and finalize flows
+// In orchestrator — all mutateAsync calls wrapped in try/catch (RQ v5 throws on error)
+// handleSaveDraft: sets lastSaved on success
 try {
-  const newId = await saveDraft(args);
-  if (newId) setLastSaved(new Date());
+  await saveDraft(args);
+  setLastSaved(new Date());
+} catch (_) { /* onError in hook handles toast */ }
+
+// handleFinalize: resets form state on success (does NOT set lastSaved)
+try {
+  await saveApuracao(args);
+  // reset rows to empty, lastSaved to null — form cleared after finalization
+  setCnRows({}); setEvRows({}); setLeadershipRows({}); setLastSaved(null);
 } catch (_) { /* onError in hook handles toast */ }
 ```
 
-`setLastSaved(new Date())` is called at the call site after both `saveDraft` and `saveApuracao` succeed (i.e., in `handleSaveDraft` and `handleFinalize` in the orchestrator).
+`setLastSaved` is called only after `saveDraft` (draft save). After `saveApuracao` (finalize), the form is reset and `lastSaved` is cleared to `null`, matching the current post-finalize behavior.
 
 `isSaving` and `isSavingDraft`, which are currently local `useState` in `ApuracaoTrimestral`, are removed from the page and sourced from the hook's mutation `isPending` values.
 
@@ -215,3 +234,7 @@ ApuracaoTrimestral (orchestrator)
 - `ApuracaoMensal.tsx` and its hooks are not touched
 - No new features are added
 - No tests (project has none)
+
+## Known Limitations
+
+- `HistoricoApuracoes` also uses `useApuracoesFechadas` but is not migrated in this refactor. It continues to use the manual `useState + useEffect` pattern. Cache invalidations triggered by `saveDraft`/`saveApuracao` mutations will not affect `HistoricoApuracoes`'s local state — it will show stale data until it remounts. This is acceptable given the explicit scope of this refactor.

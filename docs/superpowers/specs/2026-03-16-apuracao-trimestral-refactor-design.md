@@ -80,9 +80,27 @@ The hook returns `draft` (`{ apuracao, itens } | null`) and `isDraftLoading` ins
 
 `draftId` is currently a `useState` in `ApuracaoTrimestral` used in the draft status banner and initialization guards. After the refactor it is derived: `const draftId = draft?.apuracao.id ?? null`. No separate `useState` is needed.
 
+
+### Draft hydration guard
+
+The `useEffect` that hydrates form state from `draft` must not overwrite user edits on every background refetch. Use a `useRef` to track the last hydrated draft ID:
+
+```ts
+const lastHydratedDraftId = useRef<string | null>(undefined);
+
+useEffect(() => {
+  const incomingId = draft?.apuracao.id ?? null;
+  if (incomingId === lastHydratedDraftId.current) return; // same draft, skip
+  lastHydratedDraftId.current = incomingId;
+  // hydrate cnInputs, evResults, leadershipInputs from draft
+}, [draft]);
+```
+
+When the user changes trimestre/ano, the query key changes and `draft` becomes a new object with a different ID (or null), triggering hydration. Background refetches that return the same draft object return the same ID, so hydration is skipped and user edits are preserved.
+
 ### Write operations — useMutation
 
-`saveDraft` and `saveApuracao` both currently return `Promise<string | null>` (the new apuração ID). Both move to `useMutation`. Callers use `mutateAsync` (not `mutate`) so the returned ID and call-site side effects remain sequential:
+`saveDraft` and `saveApuracao` both currently return `Promise<string | null>` (the new apuração ID). Both move to `useMutation`. Callers use `mutateAsync` (not `mutate`) so the returned ID and call-site side effects remain sequential. **All `mutateAsync` call sites must be wrapped in try/catch** — in React Query v5, `mutateAsync` throws on error even when `onError` is defined in the mutation config:
 
 ```ts
 // In hook
@@ -90,7 +108,7 @@ const saveDraftMutation = useMutation({
   mutationFn: (args: SaveDraftArgs) => saveDraftFn(args),
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['apuracoes'] });
-    queryClient.invalidateQueries({ queryKey: ['draft', 'trimestral'] }); // invalidate all draft variants
+    queryClient.invalidateQueries({ queryKey: ['draft', 'trimestral'] });
     toast.success('Rascunho salvo com sucesso!'); // stays in hook (was already here)
   },
   onError: (error) => toast.error(error.message || 'Erro ao salvar rascunho'),
@@ -104,10 +122,14 @@ return {
   isSaving: saveApuracaoMutation.isPending,
 };
 
-// In orchestrator — mutateAsync preserves return value and allows call-site sequencing
-const newId = await saveDraft(args);
-if (newId) setLastSaved(new Date());
+// In orchestrator — wrapped in try/catch; setLastSaved for both save and finalize flows
+try {
+  const newId = await saveDraft(args);
+  if (newId) setLastSaved(new Date());
+} catch (_) { /* onError in hook handles toast */ }
 ```
+
+`setLastSaved(new Date())` is called at the call site after both `saveDraft` and `saveApuracao` succeed (i.e., in `handleSaveDraft` and `handleFinalize` in the orchestrator).
 
 `isSaving` and `isSavingDraft`, which are currently local `useState` in `ApuracaoTrimestral`, are removed from the page and sourced from the hook's mutation `isPending` values.
 
@@ -115,12 +137,13 @@ if (newId) setLastSaved(new Date());
 
 ### Cross-hook cache invalidation
 
-`saveApuracao` writes to both `apuracoes_fechadas` and `ev_contracts` (contract auto-deactivation). After `saveApuracao` completes, invalidate both query keys:
+`saveApuracao` writes to both `apuracoes_fechadas` and `ev_contracts` (contract auto-deactivation). After `saveApuracao` completes, invalidate all affected query keys including the draft:
 
 ```ts
 onSuccess: () => {
   queryClient.invalidateQueries({ queryKey: ['apuracoes'] });
   queryClient.invalidateQueries({ queryKey: ['ev_contracts'] });
+  queryClient.invalidateQueries({ queryKey: ['draft', 'trimestral'] });
 }
 ```
 

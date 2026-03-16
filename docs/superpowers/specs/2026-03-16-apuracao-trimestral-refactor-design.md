@@ -33,7 +33,9 @@ Each hook has both read and write operations. Only the reads and the specific wr
 |------|------------------|-------------------|-------------------|
 | `useColaboradores.ts` | `colaboradores` list, `metasMensais` list (two separate `useQuery` calls) | — | `addColaborador`, `updateColaborador`, `deleteColaborador`, `saveMetaMensal` |
 | `useContracts.ts` | `contracts` list | — | `addContract`, `addContracts`, `updateContract`, `deleteContract` |
-| `useApuracoesFechadas.ts` | `apuracoes` list, `loadDraft` (parameterized) | `saveDraft`, `saveApuracao` | `deleteApuracao`, `finalizarApuracao`, `getApuracaoItens`, `getMeusResultados` |
+| `useApuracoesFechadas.ts` | `apuracoes` list, `loadDraft` (parameterized — see below) | `saveDraft`, `saveApuracao` | `deleteApuracao`, `finalizarApuracao`, `getApuracaoItens`, `getMeusResultados` |
+
+No other files in the project use `useQuery` or `useMutation`, so changing the global `QueryClient` config affects only newly migrated queries.
 
 ### Read pattern change (list queries)
 
@@ -60,47 +62,60 @@ const { data = [], isLoading } = useQuery({
 
 ### `loadDraft` — parameterized on-demand read
 
-`loadDraft(tipo, mesReferencia)` is currently an imperative async function called inside a `useCallback` when the user selects a trimestre/ano. It becomes a `useQuery` with a parameterized query key:
+`loadDraft('trimestral', mesReferencia)` is currently an imperative async function. In `ApuracaoTrimestral`, `tipo` is always the string `'trimestral'` (hardcoded — not user-selected). `mesReferencia` is derived from the user's trimestre/ano selection: `const mesReferencia = \`${trimestre}/${ano}\`` (e.g., `"Q1/2025"`).
+
+`loadDraft` returns `{ apuracao: ApuracaoFechada; itens: ApuracaoFechadaItem[] } | null` — these types are already exported from `useApuracoesFechadas.ts`.
+
+It becomes a `useQuery` with a parameterized query key, enabled only when `mesReferencia` is defined (which it always is after mount, since trimestre/ano have defaults):
 
 ```ts
 const { data: draft, isLoading: isDraftLoading } = useQuery({
-  queryKey: ['draft', tipo, mesReferencia],
-  queryFn: () => fetchDraftFromSupabase(tipo, mesReferencia),
-  enabled: !!tipo && !!mesReferencia,
+  queryKey: ['draft', 'trimestral', mesReferencia],
+  queryFn: () => fetchDraftFromSupabase('trimestral', mesReferencia),
+  enabled: !!mesReferencia,
 });
 ```
 
-The hook returns `draft` and `isDraftLoading` instead of the imperative `loadDraft` function. `ApuracaoTrimestral` receives the draft data reactively and hydrates its form state in a `useEffect` when `draft` changes.
+The hook returns `draft` (`{ apuracao, itens } | null`) and `isDraftLoading` instead of the imperative `loadDraft` function. `ApuracaoTrimestral` hydrates its form state in a `useEffect` triggered when `draft` changes.
 
-`draftId` is currently a `useState` in `ApuracaoTrimestral` used to track the ID of an in-progress draft for display (draft status banner) and initialization guards. After the refactor, `draftId` becomes derived state: `const draftId = draft?.apuracao.id ?? null`. No separate `useState` is needed for it. The `lastSaved` timestamp (also in the current status banner) continues to live as a `useState` updated in the `saveDraft` mutation's `onSuccess`.
+`draftId` is currently a `useState` in `ApuracaoTrimestral` used in the draft status banner and initialization guards. After the refactor it is derived: `const draftId = draft?.apuracao.id ?? null`. No separate `useState` is needed.
 
 ### Write operations — useMutation
 
-`saveDraft` and `saveApuracao` become `useMutation` calls. Both currently return `Promise<string | null>` (the new apuração ID). To preserve this return value, callers use `mutateAsync`:
+`saveDraft` and `saveApuracao` both currently return `Promise<string | null>` (the new apuração ID). Both move to `useMutation`. Callers use `mutateAsync` (not `mutate`) so the returned ID and call-site side effects remain sequential:
 
 ```ts
 // In hook
 const saveDraftMutation = useMutation({
   mutationFn: (args: SaveDraftArgs) => saveDraftFn(args),
-  onSuccess: () => queryClient.invalidateQueries({ queryKey: ['apuracoes'] }),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['apuracoes'] });
+    queryClient.invalidateQueries({ queryKey: ['draft', 'trimestral'] }); // invalidate all draft variants
+    toast.success('Rascunho salvo com sucesso!'); // stays in hook (was already here)
+  },
   onError: (error) => toast.error(error.message || 'Erro ao salvar rascunho'),
 });
 
 // Hook return
-return { saveDraft: saveDraftMutation.mutateAsync, isSavingDraft: saveDraftMutation.isPending };
+return {
+  saveDraft: saveDraftMutation.mutateAsync,
+  isSavingDraft: saveDraftMutation.isPending,
+  saveApuracao: saveApuracaoMutation.mutateAsync,
+  isSaving: saveApuracaoMutation.isPending,
+};
 
-// In orchestrator
-const newId = await saveDraft(args); // still returns the ID via mutateAsync
+// In orchestrator — mutateAsync preserves return value and allows call-site sequencing
+const newId = await saveDraft(args);
 if (newId) setLastSaved(new Date());
 ```
 
-Toast messages for `saveDraft` stay in the hook (centralized). `saveApuracao` is only called from `ApuracaoTrimestral`, so centralizing its toast in the hook is safe. The write operations left as-is (`deleteApuracao`, `finalizarApuracao`) continue to handle their own toasts as before.
+`isSaving` and `isSavingDraft`, which are currently local `useState` in `ApuracaoTrimestral`, are removed from the page and sourced from the hook's mutation `isPending` values.
 
-`isSaving` and `isSavingDraft`, which are currently local `useState` in `ApuracaoTrimestral`, are removed from the page and replaced by `isPending` from the mutations exposed in the hook return value.
+`onFinalize` in `FooterBar` maps to `saveApuracao` (the handler in `ApuracaoTrimestral` calls `saveApuracao('trimestral', ...)`, not the separate `finalizarApuracao` operation, which is only used by `HistoricoApuracoes`).
 
 ### Cross-hook cache invalidation
 
-`saveApuracao` writes to both `apuracoes_fechadas` and `ev_contracts` (contract auto-deactivation logic). After `saveApuracao` completes, invalidate both query keys:
+`saveApuracao` writes to both `apuracoes_fechadas` and `ev_contracts` (contract auto-deactivation). After `saveApuracao` completes, invalidate both query keys:
 
 ```ts
 onSuccess: () => {
@@ -109,11 +124,11 @@ onSuccess: () => {
 }
 ```
 
-**Known limitation:** The writes inside `saveApuracao` are not a single Supabase transaction. If the `ev_contracts` update fails after `apuracoes_fechadas` is already written, the apuração is saved but contracts remain active. This is a pre-existing issue in the current code and is not changed by this refactor.
+**Known limitation:** The writes inside `saveApuracao` are not a single Supabase transaction. If the `ev_contracts` update fails after `apuracoes_fechadas` is already written, the apuração is saved but contracts remain active. This is a pre-existing issue, not introduced by this refactor.
 
 ### staleTime configuration
 
-The existing `new QueryClient()` in `App.tsx` uses default `staleTime: 0`, meaning every component mount triggers a background refetch. Set a 5-minute default globally in `App.tsx`:
+Set a 5-minute default globally in `App.tsx` (no existing `useQuery` calls are affected):
 
 ```ts
 const queryClient = new QueryClient({
@@ -121,23 +136,13 @@ const queryClient = new QueryClient({
 });
 ```
 
-This affects all queries in the app (currently zero, since no hooks use react-query yet), so there are no existing queries to break. Individual queries that need different stale behavior can override this at the query level.
-
-### Public API stability
-
-The hook return shapes stay compatible with existing consumers: same field names, same types. Changes:
-- `useApuracoesFechadas`: adds `isSavingDraft`, `isSaving`, `isDraftLoading`, `draft`; removes imperative `loadDraft`; `draftId` is derived in the orchestrator from `draft?.apuracao.id`
-- `useColaboradores` and `useContracts`: no changes to return shape
-
-Pages that use write operations not being migrated (`EVContratos`, `GestaoTime`, `HistoricoApuracoes`) are not affected.
-
 ---
 
 ## Phase 2: Break Up ApuracaoTrimestral.tsx
 
 ### New folder
 
-`src/components/apuracao-trimestral/`
+`src/components/apuracao-trimestral/` (new folder, does not currently exist)
 
 ### Files
 
@@ -148,20 +153,18 @@ Pages that use write operations not being migrated (`EVContratos`, `GestaoTime`,
 | `LeadershipSection.tsx` | Renders a complete `<AccordionItem value="leadership">` with trigger and content (matrix reference, input table) |
 | `FooterBar.tsx` | Fixed bottom bar: real-time totals + save/finalize action buttons |
 
-The parent `ApuracaoTrimestral.tsx` renders the `<Accordion type="multiple" ...>` wrapper and places the three section components inside it. Each section component is responsible for its own `AccordionItem`, `AccordionTrigger`, and `AccordionContent`.
+The parent renders `<Accordion type="multiple" ...>` and places the three section components inside it. Each section component is responsible for its own `AccordionItem`, `AccordionTrigger`, and `AccordionContent`.
 
 ### Orchestrator
 
 `ApuracaoTrimestral.tsx` becomes a thinner orchestrator:
-- Holds shared state: selected trimestre/ano, `lastSaved`, CN inputs, EV results, leadership inputs, `expandedSections`
+- Holds shared state: selected trimestre/ano, `lastSaved`, CN inputs (rows), EV results, leadership inputs, `expandedSections`
 - Derives `draftId` from `draft?.apuracao.id`
-- Hydrates form state from `draft` via `useEffect`
-- Computes totals passed to `FooterBar`
-- Renders the `<Accordion>` wrapper and passes state slices and callbacks as props to each section
+- Hydrates CN/EV/leadership state from `draft` via `useEffect` when `draft` changes (reactive replacement for the current `loadExistingDraft` callback)
+- Computes per-section subtotals and grand total passed to `FooterBar`
+- Renders `<Accordion>` wrapper and passes state slices + callbacks as props to each section
 
-### Utility extraction
-
-Business logic helpers currently defined at the top of `ApuracaoTrimestral.tsx` (`calcularMultiplicadorMRR`, `getQuarterMonths`, `TRIMESTRES`, `ANOS`, etc.) move to `src/lib/apuracaoTrimestralUtils.ts`. These are trimestral-specific and not shared with `ApuracaoMensal.tsx`.
+`src/lib/apuracaoTrimestralUtils.ts` is a **new file** (does not exist) that receives the business logic helpers currently at the top of `ApuracaoTrimestral.tsx`: `calcularMultiplicadorMRR`, `getQuarterMonths`, `TRIMESTRES`, `ANOS`. These are trimestral-specific and not shared with `ApuracaoMensal.tsx`.
 
 ### Data flow
 
@@ -169,7 +172,10 @@ Business logic helpers currently defined at the top of `ApuracaoTrimestral.tsx` 
 ApuracaoTrimestral (orchestrator)
   ├── useColaboradores()       ← react-query (reads only)
   ├── useContracts()           ← react-query (reads only)
-  ├── useApuracoesFechadas()   ← react-query (reads + saveDraft/saveApuracao mutations)
+  ├── useApuracoesFechadas()   ← react-query
+  │     ├── draft (reactive) ──→ useEffect hydrates cnInputs, evResults, leadershipInputs
+  │     ├── saveDraft / isSavingDraft
+  │     └── saveApuracao / isSaving
   │
   ├── <Accordion>
   │     ├── <CNSection cnInputs={...} onChange={...} colaboradores={...} subtotal={...} />

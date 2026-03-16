@@ -18,58 +18,117 @@
 
 Two sequential phases:
 
-1. **Hooks first** — migrate data layer to react-query
+1. **Hooks first** — migrate data layer to react-query reads and mutations
 2. **Components second** — extract sections into focused files
 
 ---
 
 ## Phase 1: Migrate Hooks to React-Query
 
-### Hooks in scope
+### Scope of changes per hook
 
-| Hook | Lines | Operations |
-|------|-------|------------|
-| `useColaboradores.ts` | 210 | read colaboradores |
-| `useContracts.ts` | 207 | read contracts |
-| `useApuracoesFechadas.ts` | 567 | read apurações, save draft, finalize |
+Each hook has both read and write operations. Only the reads used by `ApuracaoTrimestral` are migrated in this refactor. Write operations used exclusively by other pages (`GestaoTime`, `EVContratos`, `HistoricoApuracoes`) are left untouched to avoid unintended side effects.
 
-### Pattern change
+| Hook | Lines | Reads to migrate | Writes to migrate | Writes left as-is |
+|------|-------|------------------|-------------------|-------------------|
+| `useColaboradores.ts` | 210 | `colaboradores` list, `metasMensais` list (two separate queries) | — | `addColaborador`, `updateColaborador`, `deleteColaborador`, `saveMetaMensal` |
+| `useContracts.ts` | 207 | `contracts` list | — | `addContract`, `addContracts`, `updateContract`, `deleteContract` |
+| `useApuracoesFechadas.ts` | 567 | `apuracoes` list, `loadDraft` (parameterized) | `saveDraft`, `saveApuracao` | `deleteApuracao`, `finalizarApuracao`, `getApuracaoItens`, `getMeusResultados` |
+
+### Read pattern change (list queries)
 
 **Before:**
 ```ts
 const [data, setData] = useState([]);
-const [loading, setLoading] = useState(false);
+const [isLoading, setIsLoading] = useState(true);
 useEffect(() => {
-  setLoading(true);
+  setIsLoading(true);
   supabase.from('table').select('*').then(({ data }) => {
     setData(data);
-    setLoading(false);
+    setIsLoading(false);
   });
-}, [deps]);
+}, []);
 ```
 
 **After:**
 ```ts
 const { data = [], isLoading } = useQuery({
-  queryKey: ['table', deps],
-  queryFn: () => supabase.from('table').select('*').then(({ data }) => data),
+  queryKey: ['table'],
+  queryFn: () => supabase.from('table').select('*').then(({ data }) => data ?? []),
+  staleTime: 5 * 60 * 1000,
 });
 ```
 
-### Write operations
+### `loadDraft` — parameterized on-demand read
 
-Save draft and finalize in `useApuracoesFechadas` become `useMutation` calls, replacing manual async functions with `isPending` state and `onSuccess`/`onError` callbacks wired to toast notifications.
+`loadDraft(tipo, mesReferencia)` is currently an imperative async function called inside a `useCallback` when the user selects a trimestre/ano. It does not fit a simple list query pattern.
 
-### Public API
+It becomes a `useQuery` with a parameterized query key and `enabled` guard:
 
-Each hook's return shape stays the same (same field names, same types) so `ApuracaoTrimestral.tsx` and any other consumers require no changes in Phase 1.
+```ts
+const { data: draft, isLoading: isDraftLoading } = useQuery({
+  queryKey: ['draft', tipo, mesReferencia],
+  queryFn: () => fetchDraftFromSupabase(tipo, mesReferencia),
+  enabled: !!mesReferencia,
+  staleTime: 5 * 60 * 1000,
+});
+```
 
-### Benefits
+The hook returns `draft` and `isDraftLoading` instead of the imperative `loadDraft` function. `ApuracaoTrimestral` receives the draft data reactively and hydrates its form state via `useEffect` when `draft` changes.
 
-- **Caching:** repeated navigations don't re-fetch already-loaded data
-- **Deduplication:** multiple components using the same hook don't trigger duplicate requests
-- **Automatic refetch:** data stays fresh after mutations
-- **Less boilerplate:** removes ~30–40 lines of manual loading/error state per hook
+### Write operations — useMutation
+
+`saveDraft` and `saveApuracao` in `useApuracoesFechadas` become `useMutation` calls. Both currently return `Promise<string | null>` (the new apuração ID), which callers use to update local `draftId` state.
+
+To preserve this return value, callers use `mutateAsync` instead of `mutate`:
+
+```ts
+// In hook
+const saveDraftMutation = useMutation({
+  mutationFn: (args: SaveDraftArgs) => saveDraftFn(args),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['apuracoes'] });
+    toast.success('Rascunho salvo com sucesso!');
+  },
+  onError: (error) => toast.error(error.message || 'Erro ao salvar rascunho'),
+});
+
+// Hook return
+return { saveDraft: saveDraftMutation.mutateAsync, isSavingDraft: saveDraftMutation.isPending };
+
+// In orchestrator
+const newId = await saveDraft(args); // still returns the ID via mutateAsync
+```
+
+`isSaving` and `isSavingDraft`, which are currently local `useState` in `ApuracaoTrimestral`, are removed from the page and replaced by `isPending` from the mutations exposed in the hook return value.
+
+### Cross-hook cache invalidation
+
+`saveApuracao` writes to both `apuracoes_fechadas` and `ev_contracts` (contract auto-deactivation). After `saveApuracao` completes, invalidate both query keys:
+
+```ts
+onSuccess: () => {
+  queryClient.invalidateQueries({ queryKey: ['apuracoes'] });
+  queryClient.invalidateQueries({ queryKey: ['ev_contracts'] });
+}
+```
+
+### staleTime configuration
+
+The existing `new QueryClient()` in `App.tsx` uses default `staleTime: 0`, meaning every component mount triggers a background refetch. To realize the caching benefit, set a default `staleTime` of 5 minutes either globally in `QueryClient` or at the query level:
+
+```ts
+// App.tsx
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: 5 * 60 * 1000 } }
+});
+```
+
+### Public API stability
+
+The hook return shapes stay compatible with existing consumers: same field names, same types. The only additions are `isSavingDraft` and `isSaving` (replacing local `useState` in the orchestrator), and the removal of the imperative `loadDraft` function (replaced by reactive `draft` + `isDraftLoading` fields).
+
+Pages that use `useContracts` or `useColaboradores` write operations (`EVContratos`, `GestaoTime`, `HistoricoApuracoes`) are not affected because those write operations are not changed.
 
 ---
 
@@ -90,33 +149,34 @@ Each hook's return shape stays the same (same field names, same types) so `Apura
 
 ### Orchestrator
 
-`ApuracaoTrimestral.tsx` becomes a thin orchestrator (~150–200 lines):
+`ApuracaoTrimestral.tsx` becomes a thinner orchestrator (estimated ~300–400 lines after extraction, reduced from 1,546):
 - Holds shared state: selected trimestre/ano, draft status, CN inputs, EV results, leadership inputs
 - Computes totals passed to `FooterBar`
 - Passes state slices and callbacks as props to each section component
 
 ### Utility extraction
 
-Business logic helpers currently defined at the top of `ApuracaoTrimestral.tsx` (`calcularMultiplicadorMRR`, `getQuarterMonths`, `TRIMESTRES`, `ANOS`, etc.) move to `src/lib/apuracaoTrimestralUtils.ts`.
+Business logic helpers currently defined at the top of `ApuracaoTrimestral.tsx` (`calcularMultiplicadorMRR`, `getQuarterMonths`, `TRIMESTRES`, `ANOS`, etc.) move to `src/lib/apuracaoTrimestralUtils.ts`. These helpers are trimestral-specific and are not shared with `ApuracaoMensal.tsx`, which has its own monthly calculation logic.
 
 ### Data flow
 
 ```
 ApuracaoTrimestral (orchestrator)
-  ├── useColaboradores()       ← react-query
-  ├── useContracts()           ← react-query
-  ├── useApuracoesFechadas()   ← react-query
+  ├── useColaboradores()       ← react-query (reads only)
+  ├── useContracts()           ← react-query (reads only)
+  ├── useApuracoesFechadas()   ← react-query (reads + saveDraft/saveApuracao mutations)
   │
   ├── <CNSection cnInputs={...} onChange={...} colaboradores={...} />
   ├── <EVSection evResults={...} onUpload={...} contracts={...} />
   ├── <LeadershipSection inputs={...} onChange={...} colaboradores={...} />
-  └── <FooterBar totals={...} onSaveDraft={...} onFinalize={...} isPending={...} />
+  └── <FooterBar totals={...} onSaveDraft={...} onFinalize={...} isSaving={...} isSavingDraft={...} />
 ```
 
 ---
 
 ## Out of Scope
 
-- Other pages and hooks are not touched in this refactor
+- Write operations in `useColaboradores` and `useContracts` used by other pages are not changed
+- `ApuracaoMensal.tsx` and its hooks are not touched
 - No new features are added
 - No tests (project has none)

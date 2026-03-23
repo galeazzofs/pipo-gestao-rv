@@ -136,7 +136,7 @@ export function useApuracoesFechadas() {
   }, [fetchApuracoes]);
 
   // Load existing draft
-  const loadDraft = async (tipo: TipoApuracao, mesReferencia: string): Promise<{ apuracao: ApuracaoFechada; itens: ApuracaoFechadaItem[] } | null> => {
+  const loadDraft = useCallback(async (tipo: TipoApuracao, mesReferencia: string): Promise<{ apuracao: ApuracaoFechada; itens: ApuracaoFechadaItem[] } | null> => {
     try {
       const { data: apuracaoData, error: apuracaoError } = await supabase
         .from('apuracoes_fechadas')
@@ -167,7 +167,7 @@ export function useApuracoesFechadas() {
       console.error('Erro ao carregar rascunho:', error);
       return null;
     }
-  };
+  }, []);
 
   const saveDraft = async (
     tipo: TipoApuracao,

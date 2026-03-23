@@ -117,10 +117,12 @@ const handler = async (req: Request): Promise<Response> => {
     // Use service role client for admin operations
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Create user via admin API
+    // Create user via admin API with default password
+    const DEFAULT_PASSWORD = "Pipo@2026";
     const { data: newUser, error: createUserError } = await adminClient.auth.admin.createUser({
       email,
-      email_confirm: false,
+      password: DEFAULT_PASSWORD,
+      email_confirm: true,
       user_metadata: { nome, nivel },
     });
 
@@ -153,12 +155,6 @@ const handler = async (req: Request): Promise<Response> => {
               user_id: existingUser.id,
               role: "cn",
             });
-
-          // Send magic link
-          await adminClient.auth.admin.generateLink({
-            type: "magiclink",
-            email,
-          });
 
           return new Response(
             JSON.stringify({ success: true, message: "Profile updated for existing user" }),
@@ -197,16 +193,6 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (roleInsertError) {
       console.error("Error adding role:", roleInsertError);
-    }
-
-    // Send magic link invite
-    const { error: inviteError } = await adminClient.auth.admin.generateLink({
-      type: "magiclink",
-      email,
-    });
-
-    if (inviteError) {
-      console.error("Error generating invite link:", inviteError);
     }
 
     return new Response(

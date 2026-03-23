@@ -34,9 +34,7 @@ interface AuthContextType {
   profile: Profile | null;
   isAdmin: boolean;
   loading: boolean;
-  signInWithMagicLink: (email: string) => Promise<{ error: Error | null }>;
   signInWithPassword: (email: string, password: string) => Promise<{ error: Error | null }>;
-  checkIfAdmin: (email: string) => Promise<boolean>;
   signOut: () => Promise<void>;
 }
 
@@ -61,9 +59,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           profile: DEV_PROFILE,
           isAdmin: true,
           loading: false,
-          signInWithMagicLink: async () => ({ error: null }),
           signInWithPassword: async () => ({ error: null }),
-          checkIfAdmin: async () => true,
           signOut: async () => {},
         }}
       >
@@ -109,36 +105,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return !!data;
   };
 
-  // Check if an email belongs to an admin (for login flow)
-  const checkIfAdmin = async (email: string): Promise<boolean> => {
-    try {
-      // Query profiles to find user with this email, then check their role
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', email)
-        .maybeSingle();
-
-      if (profileError || !profileData) {
-        return false;
-      }
-
-      const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', profileData.id)
-        .eq('role', 'admin')
-        .maybeSingle();
-
-      if (roleError) {
-        return false;
-      }
-
-      return !!roleData;
-    } catch {
-      return false;
-    }
-  };
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -197,16 +163,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  const signInWithMagicLink = async (email: string) => {
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: window.location.origin,
-      },
-    });
-    return { error };
-  };
-
   const signInWithPassword = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -231,9 +187,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         profile,
         isAdmin,
         loading,
-        signInWithMagicLink,
         signInWithPassword,
-        checkIfAdmin,
         signOut,
       }}
     >

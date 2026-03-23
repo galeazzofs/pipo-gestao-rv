@@ -148,12 +148,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(newSession?.user ?? null);
 
         if (newSession?.user) {
-          const [userProfile, adminStatus] = await Promise.all([
-            fetchProfile(newSession.user.id),
-            checkAdminRole(newSession.user.id),
-          ]);
-          setProfile(userProfile);
-          setIsAdmin(adminStatus);
+          try {
+            const [userProfile, adminStatus] = await Promise.all([
+              fetchProfile(newSession.user.id),
+              checkAdminRole(newSession.user.id),
+            ]);
+            setProfile(userProfile);
+            setIsAdmin(adminStatus);
+          } catch (err) {
+            console.error('Erro ao carregar perfil/role:', err);
+          }
           setLoading(false);
         } else {
           setProfile(null);
@@ -176,10 +180,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setProfile(userProfile);
           setIsAdmin(adminStatus);
           setLoading(false);
+        }).catch((err) => {
+          console.error('Erro ao carregar perfil/role:', err);
+          setLoading(false);
         });
       } else {
         setLoading(false);
       }
+    }).catch((err) => {
+      console.error('Erro ao buscar sessão:', err);
+      setLoading(false);
     });
 
     return () => {

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l /c/Users/User/Desktop/PIPO-gestao-rv-oficial/pipo-gestao-rv/src/pages/hub/*.tsx /c/Users/User/Desktop/PIPO-gestao-rv-oficial/pipo-gestao-rv/src/pages/*.tsx)",
+      "Bash(wc -l /c/Users/User/Desktop/PIPO-gestao-rv-oficial/pipo-gestao-rv/src/components/**/*.tsx /c/Users/User/Desktop/PIPO-gestao-rv-oficial/pipo-gestao-rv/src/hooks/*.ts)",
+      "Bash(grep -n \"useQuery\\\\|useMutation\\\\|react-query\" /c/Users/User/Desktop/PIPO-gestao-rv-oficial/pipo-gestao-rv/src/pages/hub/ApuracaoTrimestral.tsx /c/Users/User/Desktop/PIPO-gestao-rv-oficial/pipo-gestao-rv/src/hooks/*.ts)"
+    ]
+  }
+}

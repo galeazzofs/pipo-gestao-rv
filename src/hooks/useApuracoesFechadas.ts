@@ -69,7 +69,8 @@ export interface ApuracaoFechadaItem {
 
 export interface ApuracaoItemInput {
   colaborador_id: string;
-  
+  cargo?: 'CN' | 'EV' | 'Lideranca'; // Usado para totalização por tipo
+
   // CNs
   sao_meta?: number;
   sao_realizado?: number;
@@ -81,12 +82,12 @@ export interface ApuracaoItemInput {
   multiplicador?: number;
   comissao_base?: number;
   bonus_trimestral?: number;
-  
+
   // EVs
   comissao_safra?: number;
   multiplicador_meta?: number;
   bonus_ev?: number;
-  
+
   // Liderança
   bonus_lideranca?: number;
   meta_mrr_lider?: number;
@@ -96,7 +97,7 @@ export interface ApuracaoItemInput {
   pct_mrr_lider?: number;
   pct_sql_lider?: number;
   multiplicador_lider?: number;
-  
+
   total_pagar: number;
   observacoes?: string;
 }
@@ -183,17 +184,17 @@ export function useApuracoesFechadas() {
         .eq('status', 'rascunho')
         .maybeSingle();
 
-      // Calculate totals
+      // Calculate totals by cargo type
       const totalCNs = itens
-        .filter(i => i.comissao_base !== undefined)
+        .filter(i => i.cargo === 'CN')
         .reduce((sum, i) => sum + (i.total_pagar || 0), 0);
-      
+
       const totalEVs = itens
-        .filter(i => i.comissao_safra !== undefined)
+        .filter(i => i.cargo === 'EV')
         .reduce((sum, i) => sum + (i.total_pagar || 0), 0);
-      
+
       const totalLideranca = itens
-        .filter(i => i.bonus_lideranca !== undefined && i.bonus_lideranca > 0)
+        .filter(i => i.cargo === 'Lideranca')
         .reduce((sum, i) => sum + (i.total_pagar || 0), 0);
 
       const totalGeral = totalCNs + totalEVs + totalLideranca;
@@ -294,7 +295,22 @@ export function useApuracoesFechadas() {
     contractPayments?: ContractPaymentInput[]
   ): Promise<string | null> => {
     try {
-      // Check if draft exists and delete it
+      // Calculate totals by cargo type
+      const totalCNs = itens
+        .filter(i => i.cargo === 'CN')
+        .reduce((sum, i) => sum + (i.total_pagar || 0), 0);
+
+      const totalEVs = itens
+        .filter(i => i.cargo === 'EV')
+        .reduce((sum, i) => sum + (i.total_pagar || 0), 0);
+
+      const totalLideranca = itens
+        .filter(i => i.cargo === 'Lideranca')
+        .reduce((sum, i) => sum + (i.total_pagar || 0), 0);
+
+      const totalGeral = totalCNs + totalEVs + totalLideranca;
+
+      // Check if draft exists — if so, promote it to finalizado (safe: no data loss on failure)
       const { data: existingDraft } = await supabase
         .from('apuracoes_fechadas')
         .select('id')
@@ -303,49 +319,54 @@ export function useApuracoesFechadas() {
         .eq('status', 'rascunho')
         .maybeSingle();
 
+      let apuracaoId: string;
+
       if (existingDraft) {
-        await supabase
+        // Promote draft to finalizado (update instead of delete+insert)
+        const { error: updateError } = await supabase
           .from('apuracoes_fechadas')
-          .delete()
+          .update({
+            total_geral: totalGeral,
+            total_cns: totalCNs,
+            total_evs: totalEVs,
+            total_lideranca: totalLideranca,
+            status: 'finalizado',
+            data_fechamento: new Date().toISOString(),
+          })
           .eq('id', existingDraft.id);
+
+        if (updateError) throw updateError;
+        apuracaoId = existingDraft.id;
+
+        // Clear old items before inserting new ones
+        await supabase
+          .from('apuracoes_fechadas_itens')
+          .delete()
+          .eq('apuracao_id', apuracaoId);
+      } else {
+        // No draft — insert new finalized apuracao
+        const { data: apuracaoData, error: apuracaoError } = await supabase
+          .from('apuracoes_fechadas')
+          .insert({
+            tipo,
+            mes_referencia: mesReferencia,
+            total_geral: totalGeral,
+            total_cns: totalCNs,
+            total_evs: totalEVs,
+            total_lideranca: totalLideranca,
+            status: 'finalizado',
+            data_fechamento: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (apuracaoError) throw apuracaoError;
+        apuracaoId = apuracaoData.id;
       }
-
-      // Calculate totals
-      const totalCNs = itens
-        .filter(i => i.comissao_base !== undefined)
-        .reduce((sum, i) => sum + (i.total_pagar || 0), 0);
-      
-      const totalEVs = itens
-        .filter(i => i.comissao_safra !== undefined)
-        .reduce((sum, i) => sum + (i.total_pagar || 0), 0);
-      
-      const totalLideranca = itens
-        .filter(i => i.bonus_lideranca !== undefined && i.bonus_lideranca > 0)
-        .reduce((sum, i) => sum + (i.total_pagar || 0), 0);
-
-      const totalGeral = totalCNs + totalEVs + totalLideranca;
-
-      // Insert finalized apuracao
-      const { data: apuracaoData, error: apuracaoError } = await supabase
-        .from('apuracoes_fechadas')
-        .insert({
-          tipo,
-          mes_referencia: mesReferencia,
-          total_geral: totalGeral,
-          total_cns: totalCNs,
-          total_evs: totalEVs,
-          total_lideranca: totalLideranca,
-          status: 'finalizado',
-          data_fechamento: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (apuracaoError) throw apuracaoError;
 
       // Insert Items
       const itensToInsert = itens.map(item => ({
-        apuracao_id: apuracaoData.id,
+        apuracao_id: apuracaoId,
         colaborador_id: item.colaborador_id,
         sao_meta: item.sao_meta,
         sao_realizado: item.sao_realizado,
@@ -382,7 +403,7 @@ export function useApuracoesFechadas() {
       if (contractPayments && contractPayments.length > 0) {
         // 1. Inserir pagamentos
         const paymentsToInsert = contractPayments.map(p => ({
-          apuracao_id: apuracaoData.id,
+          apuracao_id: apuracaoId,
           contract_id: p.contract_id,
           data_parcela: p.data_parcela,
           valor_pago: p.valor_pago
@@ -410,10 +431,11 @@ export function useApuracoesFechadas() {
               const manual = contractRes.data.meses_pagos_manual || 0;
               
               // Conta meses únicos (YYYY-MM) pagos pelo sistema
+              // Usa substring da data ISO (YYYY-MM) para evitar problemas de timezone
               const uniqueMonths = new Set(
                 paymentsRes.data.map(p => {
-                  const d = new Date(p.data_parcela);
-                  return `${d.getFullYear()}-${d.getMonth()}`;
+                  // data_parcela é salva como "YYYY-MM-DD", extrai ano-mês direto da string
+                  return String(p.data_parcela).substring(0, 7);
                 })
               );
               
@@ -434,7 +456,7 @@ export function useApuracoesFechadas() {
 
       toast.success(`Apuração ${tipo} finalizada com sucesso!`);
       await fetchApuracoes();
-      return apuracaoData.id;
+      return apuracaoId;
     } catch (error: any) {
       console.error('Erro ao salvar apuração:', error);
       toast.error(error.message || 'Erro ao salvar apuração');
@@ -464,6 +486,18 @@ export function useApuracoesFechadas() {
 
   const deleteApuracao = async (id: string): Promise<boolean> => {
     try {
+      // Verifica se é finalizada antes de permitir deleção
+      const { data: apuracao } = await supabase
+        .from('apuracoes_fechadas')
+        .select('status')
+        .eq('id', id)
+        .single();
+
+      if (apuracao?.status === 'finalizado') {
+        toast.error('Não é possível remover uma apuração finalizada');
+        return false;
+      }
+
       const { error } = await supabase
         .from('apuracoes_fechadas')
         .delete()
@@ -519,7 +553,7 @@ export function useApuracoesFechadas() {
     return apuracoes.filter(a => a.status === 'finalizado');
   }, [apuracoes]);
 
-  const getMeusResultados = async (email: string): Promise<ApuracaoFechadaItem[]> => {
+  const getMeusResultados = async (email: string): Promise<(ApuracaoFechadaItem & { apuracao?: Pick<ApuracaoFechada, 'id' | 'tipo' | 'mes_referencia' | 'data_fechamento' | 'status'> })[]> => {
     try {
       const { data: colaboradorData, error: colaboradorError } = await supabase
         .from('colaboradores')
@@ -541,8 +575,8 @@ export function useApuracoesFechadas() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
-      return (data || []) as any[];
+
+      return (data || []) as (ApuracaoFechadaItem & { apuracao?: Pick<ApuracaoFechada, 'id' | 'tipo' | 'mes_referencia' | 'data_fechamento' | 'status'> })[];
     } catch (error: any) {
       console.error('Erro ao buscar meus resultados:', error);
       return [];

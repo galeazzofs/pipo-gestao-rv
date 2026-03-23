@@ -88,7 +88,7 @@ export default function GestaoTime() {
   const [isMetasDialogOpen, setIsMetasDialogOpen] = useState(false);
   const [selectedCNForMetas, setSelectedCNForMetas] = useState<Colaborador | null>(null);
 
-  const lideres = getLideres();
+  const lideres = getLideres;
 
   const filteredColaboradores = colaboradores.filter(c => {
     const matchSearch = c.nome.toLowerCase().includes(search.toLowerCase()) ||

@@ -76,12 +76,14 @@ function findMatchingContract(row: ExcelRow, contracts: Contract[]): Contract | 
   const normalizedProduto = normalizeString(row.produto);
   const normalizedOperadora = normalizeString(row.operadora);
 
-  // Busca contrato onde cliente + produto + operadora batem exatamente
+  // Busca contrato ATIVO onde cliente + produto + operadora batem exatamente
   return contracts.find(c => {
+    if (c.ativo === false) return false; // Ignora contratos inativos/finalizados
+
     const clienteMatch = normalizeString(c.cliente) === normalizedCliente;
     const produtoMatch = normalizeString(c.produto) === normalizedProduto;
     const operadoraMatch = normalizeString(c.operadora) === normalizedOperadora;
-    
+
     return clienteMatch && produtoMatch && operadoraMatch;
   }) || null;
 }

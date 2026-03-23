@@ -31,7 +31,8 @@ export function useContracts() {
           porte: row.porte as Porte,
           atingimento: Number(row.atingimento),
           dataInicio: row.data_inicio,
-          mesesPagosManual: row.meses_pagos_manual || 0
+          mesesPagosManual: row.meses_pagos_manual || 0,
+          ativo: row.ativo !== false, // default true se null/undefined
         })));
       }
     } catch (error) {

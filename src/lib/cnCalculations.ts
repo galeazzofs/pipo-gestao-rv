@@ -1,12 +1,31 @@
 // Lógica de cálculo de comissão para CNs (Regra de Ouro)
 
 export type CNLevel = 'CN1' | 'CN2' | 'CN3';
+export type CNPorte = 'M' | 'G+';
 
 export const CN_TARGETS: Record<CNLevel, number> = {
   CN1: 2000,
   CN2: 2500,
   CN3: 3000,
 };
+
+/**
+ * Multiplicadores de Meta Vidas por Porte do CN
+ * Meta Vidas = Meta SAO × multiplicador do porte
+ */
+export const VIDAS_MULTIPLIER_POR_PORTE: Record<CNPorte, number> = {
+  'M': 350,
+  'G+': 1500,
+};
+
+/**
+ * Calcula a Meta de Vidas baseada na Meta SAO e no Porte do CN
+ */
+export function calcularMetaVidas(metaSAO: number, porte: CNPorte | null): number {
+  if (!porte || metaSAO <= 0) return 0;
+  const multiplier = VIDAS_MULTIPLIER_POR_PORTE[porte];
+  return multiplier ? metaSAO * multiplier : 0;
+}
 
 export interface CalculoDetails {
   pctSAO: number;
@@ -59,19 +78,19 @@ export function calcularComissaoCN(
   // 2. Ponderação: SAO 70%, Vidas 30%
   const scoreFinal = (pctSAO * 0.70) + (pctVidas * 0.30);
 
-  // 3. Régua de Pagamento
+  // 3. Régua de Pagamento (faixas contínuas, sem gaps)
   let multiplicador = 0;
-  if (scoreFinal < 0.199) {
+  if (scoreFinal < 0.20) {
     multiplicador = 0;
-  } else if (scoreFinal >= 0.20 && scoreFinal < 0.399) {
+  } else if (scoreFinal < 0.40) {
     multiplicador = 0.20;
-  } else if (scoreFinal >= 0.40 && scoreFinal < 0.999) {
+  } else if (scoreFinal < 1.00) {
     multiplicador = scoreFinal;
-  } else if (scoreFinal >= 1.00 && scoreFinal < 1.099) {
+  } else if (scoreFinal < 1.10) {
     multiplicador = 1.20;
-  } else if (scoreFinal >= 1.10 && scoreFinal < 1.399) {
+  } else if (scoreFinal < 1.40) {
     multiplicador = 1.80;
-  } else if (scoreFinal >= 1.40) {
+  } else {
     multiplicador = 2.10;
   }
 
@@ -100,10 +119,10 @@ export function formatPorcentagem(valor: number): string {
  * Retorna a descrição da faixa de pagamento baseada no score
  */
 export function getFaixaPagamento(scoreFinal: number): string {
-  if (scoreFinal < 0.199) return 'Abaixo do mínimo';
-  if (scoreFinal < 0.399) return 'Faixa inicial (20%)';
-  if (scoreFinal < 0.999) return 'Faixa progressiva';
-  if (scoreFinal < 1.099) return 'Meta atingida (120%)';
-  if (scoreFinal < 1.399) return 'Superação (180%)';
+  if (scoreFinal < 0.20) return 'Abaixo do mínimo';
+  if (scoreFinal < 0.40) return 'Faixa inicial (20%)';
+  if (scoreFinal < 1.00) return 'Faixa progressiva';
+  if (scoreFinal < 1.10) return 'Meta atingida (120%)';
+  if (scoreFinal < 1.40) return 'Superação (180%)';
   return 'Excelência (210%)';
 }

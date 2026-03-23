@@ -3,7 +3,7 @@ import { Navbar } from '@/components/Navbar';
 import { AdminRoute } from '@/components/AdminRoute';
 import { useColaboradores } from '@/hooks/useColaboradores';
 import { useApuracoesFechadas, ApuracaoItemInput, ApuracaoFechadaItem } from '@/hooks/useApuracoesFechadas';
-import { calcularComissaoCN, CNLevel, CN_TARGETS } from '@/lib/cnCalculations';
+import { calcularComissaoCN, CNLevel, CN_TARGETS, calcularMetaVidas } from '@/lib/cnCalculations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -22,8 +22,19 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Receipt, 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
+  Receipt,
   Calculator,
   Save,
   Loader2,
@@ -61,19 +72,19 @@ interface CNRow {
 export default function ApuracaoMensal() {
   const { colaboradores, metasMensais, isLoading: loadingColaboradores, getCNs } = useColaboradores();
   const { saveApuracao, saveDraft, loadDraft, isLoading: loadingApuracoes } = useApuracoesFechadas();
-  
+
   const currentDate = new Date();
   const [mes, setMes] = useState(MESES[currentDate.getMonth()]);
   const [ano, setAno] = useState(String(currentDate.getFullYear()));
-  
+
   // Estados de salvamento/carregamento
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  
-  const cns = getCNs();
+
+  const cns = getCNs;
 
   // Estado para cada linha de CN
   const [rows, setRows] = useState<Record<string, Omit<CNRow, 'colaboradorId' | 'nome' | 'nivel' | 'target'>>>({});
@@ -142,12 +153,9 @@ export default function ApuracaoMensal() {
         );
         const metaSaoValor = metaMensalEspecifica ? metaMensalEspecifica.meta_sao : (cn.meta_sao || 0);
 
-        // 2. Calcula Meta Vidas (Baseado no Porte)
-        let metaVidasValor = 0;
-        if (metaSaoValor > 0 && cn.porte) {
-          if (cn.porte === 'M') metaVidasValor = metaSaoValor * 350;
-          else if (cn.porte === 'G+') metaVidasValor = metaSaoValor * 1500;
-        } else {
+        // 2. Calcula Meta Vidas (Baseado no Porte via função centralizada)
+        let metaVidasValor = calcularMetaVidas(metaSaoValor, cn.porte);
+        if (metaVidasValor === 0) {
           metaVidasValor = cn.meta_vidas || 0;
         }
 
@@ -218,6 +226,7 @@ export default function ApuracaoMensal() {
       if ((onlyComplete && isComplete) || (!onlyComplete && hasAnyData)) {
         itens.push({
           colaborador_id: cn.id,
+          cargo: 'CN',
           sao_meta: parseFloat(row.saoMeta) || 0,
           sao_realizado: parseFloat(row.saoRealizado) || 0,
           vidas_meta: parseFloat(row.vidasMeta) || 0,
@@ -482,14 +491,33 @@ export default function ApuracaoMensal() {
                     Salvar Rascunho
                   </Button>
 
-                  <Button 
-                    onClick={handleFinalize} 
-                    disabled={isSaving || totalComissoes === 0}
-                    className="gap-2"
-                  >
-                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCheck className="w-4 h-4" />}
-                    Finalizar Fechamento
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        disabled={isSaving || totalComissoes === 0}
+                        className="gap-2"
+                      >
+                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCheck className="w-4 h-4" />}
+                        Finalizar Fechamento
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Finalizar Apuração Mensal?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Tem certeza que deseja finalizar a apuração de <strong>{mesReferencia}</strong>?
+                          Total a pagar: <strong>{formatCurrency(totalComissoes)}</strong>.
+                          Esta ação não pode ser desfeita.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleFinalize}>
+                          Confirmar Finalização
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             </div>

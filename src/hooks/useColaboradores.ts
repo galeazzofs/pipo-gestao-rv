@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -93,29 +93,16 @@ export function useColaboradores() {
     refetch();
   }, []);
 
-  // Helpers de filtro
-  const getCNs = () => colaboradores.filter(c => c.cargo === 'CN' && c.ativo);
-  const getEVs = () => colaboradores.filter(c => c.cargo === 'EV' && c.ativo);
-  const getLideres = () => colaboradores.filter(c => c.cargo === 'Lideranca' && c.ativo);
+  // Helpers de filtro (memoizados para evitar re-renders desnecessários)
+  const getCNs = useMemo(() => colaboradores.filter(c => c.cargo === 'CN' && c.ativo), [colaboradores]);
+  const getEVs = useMemo(() => colaboradores.filter(c => c.cargo === 'EV' && c.ativo), [colaboradores]);
+  const getLideres = useMemo(() => colaboradores.filter(c => c.cargo === 'Lideranca' && c.ativo), [colaboradores]);
 
   // --- FUNÇÕES DE CRUD (Restauradas) ---
 
   const addColaborador = async (input: ColaboradorInput): Promise<boolean> => {
     try {
-      interface ColaboradorPayload {
-        nome: string;
-        email: string;
-        cargo: Cargo;
-        nivel: string | null;
-        porte: Porte | null;
-        lider_id: string | null;
-        salario_base: number;
-        meta_sao: number;
-        meta_vidas: number;
-        meta_mrr: number;
-        ativo: boolean;
-      }
-      const payload: ColaboradorPayload = {
+      const payload = {
         nome: input.nome,
         email: input.email,
         cargo: input.cargo,
@@ -134,7 +121,7 @@ export function useColaboradores() {
       if (error) throw error;
       
       toast.success('Colaborador adicionado com sucesso');
-      fetchColaboradores();
+      await fetchColaboradores();
       return true;
     } catch (error) {
       console.error('Erro ao adicionar:', error);
@@ -145,15 +132,28 @@ export function useColaboradores() {
 
   const updateColaborador = async (id: string, input: Partial<ColaboradorInput>): Promise<boolean> => {
     try {
+      // Constrói payload com nomes de coluna corretos do banco
+      const updateData: Record<string, unknown> = {};
+      if (input.nome !== undefined) updateData.nome = input.nome;
+      if (input.email !== undefined) updateData.email = input.email;
+      if (input.cargo !== undefined) updateData.cargo = input.cargo;
+      if (input.nivel !== undefined) updateData.nivel = input.nivel;
+      if (input.porte !== undefined) updateData.porte = input.porte;
+      if (input.lider_id !== undefined) updateData.lider_id = input.lider_id;
+      if (input.salario_base !== undefined) updateData.salario_base = input.salario_base;
+      if (input.meta_sao !== undefined) updateData.meta_sao = input.meta_sao;
+      if (input.meta_vidas !== undefined) updateData.meta_vidas = input.meta_vidas;
+      if (input.meta_mrr !== undefined) updateData.meta_mrr = input.meta_mrr;
+
       const { error } = await supabase
         .from('colaboradores')
-        .update(input)
+        .update(updateData)
         .eq('id', id);
 
       if (error) throw error;
 
       toast.success('Colaborador atualizado');
-      fetchColaboradores();
+      await fetchColaboradores();
       return true;
     } catch (error) {
       console.error('Erro ao atualizar:', error);
@@ -172,7 +172,7 @@ export function useColaboradores() {
       if (error) throw error;
 
       toast.success('Colaborador removido');
-      fetchColaboradores();
+      await fetchColaboradores();
       return true;
     } catch (error) {
       console.error('Erro ao remover:', error);

@@ -21,8 +21,9 @@ export interface Contract {
   operadora: string;
   porte: Porte;
   atingimento: number;
-  dataInicio: string; 
-  mesesPagosManual?: number; // <--- ADICIONADO AQUI
+  dataInicio: string;
+  mesesPagosManual?: number;
+  ativo?: boolean;
 }
 
 export interface ExcelRow {
@@ -58,3 +59,14 @@ export function getTaxa(porte: Porte, atingimento: number): number {
 
 // Funções centralizadas em formatters.ts e re-exportadas aqui para compatibilidade
 export { formatCurrency, formatPercent, formatPercentage } from './formatters';
+
+/**
+ * Multiplicador MRR para EVs baseado no % de atingimento da meta
+ * Usado na apuração trimestral para calcular o bônus EV
+ */
+export function calcularMultiplicadorMRR(pctAtingimento: number): number {
+  if (pctAtingimento < 80) return 0;
+  if (pctAtingimento < 95) return 0.5;
+  if (pctAtingimento < 125) return 1.0;
+  return 1.5;
+}

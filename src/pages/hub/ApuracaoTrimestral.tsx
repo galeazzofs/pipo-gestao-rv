@@ -9,7 +9,7 @@ import { useApuracoesFechadas, ApuracaoItemInput, ApuracaoFechadaItem } from '@/
 import { useContracts } from '@/hooks/useContracts';
 import { calcularComissaoCN, CNLevel, CN_TARGETS } from '@/lib/cnCalculations';
 import { processCommissions, calculateTotals } from '@/components/ev/ProcessingEngine';
-import { ExcelRow, formatCurrency as formatCurrencyEV, ProcessedResult } from '@/lib/evCalculations';
+import { ExcelRow, formatCurrency as formatCurrencyEV, ProcessedResult, calcularMultiplicadorMRR } from '@/lib/evCalculations';
 import { ResultsDashboard } from '@/components/ev/ResultsDashboard';
 import { ResultsTable } from '@/components/ev/ResultsTable';
 import { getMultiplicadorLideranca, calcularMetaMRRLider } from '@/lib/leadershipCalculations';
@@ -79,15 +79,8 @@ const TRIMESTRES = [
   { value: 'Q4', label: 'Q4 (Out-Dez)' },
 ];
 
-const ANOS = ['2024', '2025', '2026', '2027'];
-
-// Function to calculate multiplier based on MRR achievement %
-const calcularMultiplicadorMRR = (pctAtingimento: number): number => {
-  if (pctAtingimento < 80) return 0;
-  if (pctAtingimento < 95) return 0.5;
-  if (pctAtingimento < 125) return 1.0;
-  return 1.5;
-};
+// Gera lista de anos: 2024 até ano atual + 2
+const ANOS = Array.from({ length: new Date().getFullYear() - 2024 + 3 }, (_, i) => String(2024 + i));
 
 // Returns the months of the selected quarter (0-indexed: Jan=0, Dec=11)
 const getQuarterMonths = (quarter: string): number[] => {
@@ -165,9 +158,9 @@ export default function ApuracaoTrimestral() {
   const [expandedSections, setExpandedSections] = useState<string[]>(['cns', 'evs', 'lideranca']);
   const [hasInitializedMetas, setHasInitializedMetas] = useState(false);
   
-  const cns = getCNs();
-  const evs = getEVs();
-  const lideres = getLideres();
+  const cns = getCNs;
+  const evs = getEVs;
+  const lideres = getLideres;
 
   // States by category
   const [cnRows, setCnRows] = useState<Record<string, CNRow>>({});
@@ -234,11 +227,17 @@ export default function ApuracaoTrimestral() {
             total: item.total_pagar,
           };
         } else if (item.colaborador?.cargo === 'EV') {
+          // sao_meta e sao_realizado são reaproveitados para armazenar metaMRR e mrrRealizado dos EVs
+          const metaMRR = item.sao_meta?.toString() || '';
+          const mrrRealizado = item.sao_realizado?.toString() || '';
+          const meta = parseFloat(metaMRR) || 0;
+          const realizado = parseFloat(mrrRealizado) || 0;
+          const pctAtingimento = meta > 0 ? (realizado / meta) * 100 : 0;
           newEvRows[item.colaborador_id] = {
             comissaoSafra: item.comissao_safra || 0,
-            metaMRR: '',
-            mrrRealizado: '',
-            pctAtingimento: 0,
+            metaMRR,
+            mrrRealizado,
+            pctAtingimento,
             multiplicador: item.multiplicador_meta || 1,
             bonusEV: item.bonus_ev || 0,
             total: item.total_pagar,
@@ -282,7 +281,7 @@ export default function ApuracaoTrimestral() {
     if (!loadingColaboradores) {
       loadExistingDraft();
     }
-  }, [trimestre, ano, loadingColaboradores]);
+  }, [trimestre, ano, loadingColaboradores, loadExistingDraft]);
 
   // Pre-fill goals from colaboradores when no draft loaded
   useEffect(() => {
@@ -487,11 +486,8 @@ export default function ApuracaoTrimestral() {
     evs.forEach(ev => {
       const evResultsFiltered = results.filter(r => {
         if (!r.contract) return false;
-        const evName = normalize(r.contract.nomeEV);
-        const colaboradorName = normalize(ev.nome);
-        return evName === colaboradorName || 
-               evName.includes(colaboradorName) || 
-               colaboradorName.includes(evName);
+        // Match exato normalizado para evitar "Maria" matchando com "Maria Clara"
+        return normalize(r.contract.nomeEV) === normalize(ev.nome);
       });
       
       const comissaoSafra = evResultsFiltered
@@ -547,7 +543,7 @@ export default function ApuracaoTrimestral() {
     if (excelDataOriginal.length > 0) {
       processExcelForQuarter(excelDataOriginal, trimestre, ano);
     }
-  }, [trimestre, ano]);
+  }, [trimestre, ano, excelDataOriginal, processExcelForQuarter]);
 
   // Handler for Leadership
   const updateLiderRow = (id: string, field: 'metaSQL' | 'realizadoMRR' | 'realizadoSQL', value: string) => {
@@ -608,6 +604,7 @@ export default function ApuracaoTrimestral() {
       if (row && (row.total > 0 || row.saoMeta || row.saoRealizado)) {
         itens.push({
           colaborador_id: cn.id,
+          cargo: 'CN',
           sao_meta: parseFloat(row.saoMeta) || 0,
           sao_realizado: parseFloat(row.saoRealizado) || 0,
           vidas_meta: parseFloat(row.vidasMeta) || 0,
@@ -628,7 +625,11 @@ export default function ApuracaoTrimestral() {
       if (row && (row.total > 0 || row.comissaoSafra > 0)) {
         itens.push({
           colaborador_id: ev.id,
+          cargo: 'EV',
           comissao_safra: row.comissaoSafra,
+          // Reutiliza sao_meta/sao_realizado para persistir metaMRR/mrrRealizado dos EVs
+          sao_meta: parseFloat(row.metaMRR) || 0,
+          sao_realizado: parseFloat(row.mrrRealizado) || 0,
           multiplicador_meta: row.multiplicador,
           bonus_ev: row.bonusEV,
           total_pagar: row.total,
@@ -641,6 +642,7 @@ export default function ApuracaoTrimestral() {
       if (row && (row.total > 0 || row.metaSQL || row.realizadoMRR || row.realizadoSQL)) {
         itens.push({
           colaborador_id: lider.id,
+          cargo: 'Lideranca',
           bonus_lideranca: row.bonus,
           meta_mrr_lider: row.metaMRRCalculada,
           meta_sql_lider: parseFloat(row.metaSQL) || 0,
@@ -714,12 +716,18 @@ export default function ApuracaoTrimestral() {
     // Filtramos apenas resultados válidos que tenham contrato vinculado
     const contractPayments = evResults
       .filter(result => result.status === 'valido' && result.contract)
-      .map(result => ({
-        contract_id: result.contract!.id,
-        // Converte a data do objeto JS para string ISO (YYYY-MM-DD)
-        data_parcela: result.excelRow.dataRecebimento.toISOString(), 
-        valor_pago: result.comissao || 0
-      }));
+      .map(result => {
+        // Formata como YYYY-MM-DD local (sem conversão UTC que muda o mês)
+        const d = result.excelRow.dataRecebimento;
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return {
+          contract_id: result.contract!.id,
+          data_parcela: `${yyyy}-${mm}-${dd}`,
+          valor_pago: result.comissao || 0
+        };
+      });
 
     // Passamos os pagamentos como 4º argumento
     const result = await saveApuracao('trimestral', mesReferencia, itens, contractPayments);

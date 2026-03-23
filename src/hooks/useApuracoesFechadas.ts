@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -169,7 +169,7 @@ export function useApuracoesFechadas() {
     }
   }, []);
 
-  const saveDraft = async (
+  const saveDraft = useCallback(async (
     tipo: TipoApuracao,
     mesReferencia: string,
     itens: ApuracaoItemInput[]
@@ -286,9 +286,9 @@ export function useApuracoesFechadas() {
       toast.error(error.message || 'Erro ao salvar rascunho');
       return null;
     }
-  };
+  }, [fetchApuracoes]);
 
-  const saveApuracao = async (
+  const saveApuracao = useCallback(async (
     tipo: TipoApuracao,
     mesReferencia: string,
     itens: ApuracaoItemInput[],
@@ -462,9 +462,9 @@ export function useApuracoesFechadas() {
       toast.error(error.message || 'Erro ao salvar apuração');
       return null;
     }
-  };
+  }, [fetchApuracoes]);
 
-  const getApuracaoItens = async (apuracaoId: string): Promise<ApuracaoFechadaItem[]> => {
+  const getApuracaoItens = useCallback(async (apuracaoId: string): Promise<ApuracaoFechadaItem[]> => {
     try {
       const { data, error } = await supabase
         .from('apuracoes_fechadas_itens')
@@ -482,9 +482,9 @@ export function useApuracoesFechadas() {
       toast.error('Erro ao carregar detalhes da apuração');
       return [];
     }
-  };
+  }, []);
 
-  const deleteApuracao = async (id: string): Promise<boolean> => {
+  const deleteApuracao = useCallback(async (id: string): Promise<boolean> => {
     try {
       // Verifica se é finalizada antes de permitir deleção
       const { data: apuracao } = await supabase
@@ -513,9 +513,9 @@ export function useApuracoesFechadas() {
       toast.error(error.message || 'Erro ao remover apuração');
       return false;
     }
-  };
+  }, [fetchApuracoes]);
 
-  const finalizarApuracao = async (id: string): Promise<boolean> => {
+  const finalizarApuracao = useCallback(async (id: string): Promise<boolean> => {
     try {
       const { error } = await supabase
         .from('apuracoes_fechadas')
@@ -535,25 +535,14 @@ export function useApuracoesFechadas() {
       toast.error(error.message || 'Erro ao finalizar apuração');
       return false;
     }
-  };
+  }, [fetchApuracoes]);
 
-  const getMensais = useCallback(() => {
-    return apuracoes.filter(a => a.tipo === 'mensal');
-  }, [apuracoes]);
+  const mensais = useMemo(() => apuracoes.filter(a => a.tipo === 'mensal'), [apuracoes]);
+  const trimestrais = useMemo(() => apuracoes.filter(a => a.tipo === 'trimestral'), [apuracoes]);
+  const rascunhos = useMemo(() => apuracoes.filter(a => a.status === 'rascunho'), [apuracoes]);
+  const finalizados = useMemo(() => apuracoes.filter(a => a.status === 'finalizado'), [apuracoes]);
 
-  const getTrimestrais = useCallback(() => {
-    return apuracoes.filter(a => a.tipo === 'trimestral');
-  }, [apuracoes]);
-
-  const getRascunhos = useCallback(() => {
-    return apuracoes.filter(a => a.status === 'rascunho');
-  }, [apuracoes]);
-
-  const getFinalizados = useCallback(() => {
-    return apuracoes.filter(a => a.status === 'finalizado');
-  }, [apuracoes]);
-
-  const getMeusResultados = async (email: string): Promise<(ApuracaoFechadaItem & { apuracao?: Pick<ApuracaoFechada, 'id' | 'tipo' | 'mes_referencia' | 'data_fechamento' | 'status'> })[]> => {
+  const getMeusResultados = useCallback(async (email: string): Promise<(ApuracaoFechadaItem & { apuracao?: Pick<ApuracaoFechada, 'id' | 'tipo' | 'mes_referencia' | 'data_fechamento' | 'status'> })[]> => {
     try {
       const { data: colaboradorData, error: colaboradorError } = await supabase
         .from('colaboradores')
@@ -581,7 +570,7 @@ export function useApuracoesFechadas() {
       console.error('Erro ao buscar meus resultados:', error);
       return [];
     }
-  };
+  }, []);
 
   return {
     apuracoes,
@@ -592,10 +581,10 @@ export function useApuracoesFechadas() {
     finalizarApuracao,
     getApuracaoItens,
     deleteApuracao,
-    getMensais,
-    getTrimestrais,
-    getRascunhos,
-    getFinalizados,
+    mensais,
+    trimestrais,
+    rascunhos,
+    finalizados,
     getMeusResultados,
     refetch: fetchApuracoes,
   };

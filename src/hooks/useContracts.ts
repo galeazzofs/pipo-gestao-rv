@@ -3,6 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Contract, Porte } from '@/lib/evCalculations';
 import { toast } from 'sonner';
 
+const normalize = (str: string) =>
+  str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
 export function useContracts() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -183,9 +186,6 @@ export function useContracts() {
   }, [fetchContracts]);
 
   const getContractByKey = useCallback((cliente: string, produto: string, operadora: string) => {
-    const normalize = (str: string) => 
-      str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-    
     return contracts.find(c => {
       const clienteMatch = normalize(c.cliente) === normalize(cliente);
       const produtoMatch = normalize(c.produto) === normalize(produto);

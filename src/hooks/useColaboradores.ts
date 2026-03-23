@@ -100,7 +100,7 @@ export function useColaboradores() {
 
   // --- FUNÇÕES DE CRUD (Restauradas) ---
 
-  const addColaborador = async (input: ColaboradorInput): Promise<boolean> => {
+  const addColaborador = useCallback(async (input: ColaboradorInput): Promise<boolean> => {
     try {
       const payload = {
         nome: input.nome,
@@ -128,9 +128,9 @@ export function useColaboradores() {
       toast.error('Erro ao adicionar colaborador');
       return false;
     }
-  };
+  }, [fetchColaboradores]);
 
-  const updateColaborador = async (id: string, input: Partial<ColaboradorInput>): Promise<boolean> => {
+  const updateColaborador = useCallback(async (id: string, input: Partial<ColaboradorInput>): Promise<boolean> => {
     try {
       // Constrói payload com nomes de coluna corretos do banco
       const updateData: Record<string, unknown> = {};
@@ -160,9 +160,9 @@ export function useColaboradores() {
       toast.error('Erro ao atualizar colaborador');
       return false;
     }
-  };
+  }, [fetchColaboradores]);
 
-  const deleteColaborador = async (id: string): Promise<boolean> => {
+  const deleteColaborador = useCallback(async (id: string): Promise<boolean> => {
     try {
       const { error } = await supabase
         .from('colaboradores')
@@ -179,11 +179,9 @@ export function useColaboradores() {
       toast.error('Erro ao remover colaborador');
       return false;
     }
-  };
+  }, [fetchColaboradores]);
 
-  // --- NOVA FUNÇÃO: Salvar Meta Mensal ---
-
-  const saveMetaMensal = async (colaboradorId: string, mes: number, ano: number, metaSao: number): Promise<boolean> => {
+  const saveMetaMensal = useCallback(async (colaboradorId: string, mes: number, ano: number, metaSao: number): Promise<boolean> => {
     try {
       const { error } = await supabase
         .from('metas_sao_mensais')
@@ -204,7 +202,7 @@ export function useColaboradores() {
       toast.error('Erro ao salvar meta mensal');
       return false;
     }
-  };
+  }, [fetchMetasMensais]);
 
   return {
     colaboradores,

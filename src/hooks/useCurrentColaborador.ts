@@ -27,8 +27,16 @@ export function useCurrentColaborador() {
       .select('*')
       .eq('email', user.email)
       .maybeSingle()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Erro ao buscar colaborador:', error);
+        }
         setColaborador(data as Colaborador | null);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.error('Erro ao buscar colaborador:', err);
+        setColaborador(null);
         setIsLoading(false);
       });
   }, [user?.email, authLoading]);

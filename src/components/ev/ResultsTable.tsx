@@ -91,10 +91,12 @@ export function ResultsTable({ results, selectedMonth, selectedEV }: ResultsTabl
           <TableBody>
             {filteredResults.map((result, index) => {
               const isInvalid = result.status !== 'valido';
-              
+              const row = result.excelRow;
+              const key = `${row.clienteMae}-${row.produto}-${row.operadora}-${row.nfLiquido}-${row.dataRecebimento.getTime()}-${index}`;
+
               return (
-                <TableRow 
-                  key={index}
+                <TableRow
+                  key={key}
                   className={isInvalid ? 'opacity-50 bg-muted/20' : ''}
                 >
                   <TableCell className="whitespace-nowrap">

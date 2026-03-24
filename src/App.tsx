@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Páginas Públicas / Autenticação
 import Landing from "./pages/Landing";
@@ -38,6 +39,7 @@ const App = () => (
       
       <BrowserRouter>
         <AuthProvider>
+          <ErrorBoundary>
           <Routes>
             {/* Rota de Login (Novo Design) */}
             <Route path="/login" element={<Login />} />
@@ -107,6 +109,7 @@ const App = () => (
             {/* Rota 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </ErrorBoundary>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

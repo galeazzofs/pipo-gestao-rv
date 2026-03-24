@@ -47,7 +47,7 @@ function parseProduto(value: string): string {
   return produto || value;
 }
 
-function parseDataInicio(value: any): string | null {
+function parseDataInicio(value: string | number | Date | null | undefined): string | null {
   if (!value) return null;
 
   // Se for número serial do Excel
@@ -168,7 +168,7 @@ export function ContractExcelUpload({ onContractsLoaded }: ContractExcelUploadPr
       const workbook = XLSX.read(data, { type: 'array', cellDates: true });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+      const jsonData = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1 });
 
       if (jsonData.length < 2) {
         setError('Planilha vazia ou sem dados');
@@ -186,7 +186,7 @@ export function ContractExcelUpload({ onContractsLoaded }: ContractExcelUploadPr
       const contracts: ParsedContract[] = [];
 
       for (let i = 1; i < jsonData.length; i++) {
-        const row = jsonData[i] as any[];
+        const row = jsonData[i] as unknown[];
         if (!row || row.length === 0) continue;
 
         const nomeEV = String(row[mapping.ev] || '').trim();

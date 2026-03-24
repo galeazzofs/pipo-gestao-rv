@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Contract, Porte } from '@/lib/evCalculations';
 import { toast } from 'sonner';
@@ -6,54 +7,50 @@ import { toast } from 'sonner';
 const normalize = (str: string) =>
   str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
+const CONTRACTS_KEY = ['contracts'] as const;
+
+async function fetchContractsData(): Promise<Contract[]> {
+  const { data, error } = await supabase
+    .from('ev_contracts')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return (data || []).map(row => ({
+    id: row.id,
+    nomeEV: row.nome_ev,
+    cliente: row.cliente,
+    produto: row.produto,
+    operadora: row.operadora,
+    porte: row.porte as Porte,
+    atingimento: Number(row.atingimento),
+    dataInicio: row.data_inicio,
+    mesesPagosManual: row.meses_pagos_manual || 0,
+    ativo: row.ativo !== false,
+  }));
+}
+
 export function useContracts() {
-  const [contracts, setContracts] = useState<Contract[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchContracts = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('ev_contracts')
-        .select('*')
-        .order('created_at', { ascending: false });
+  const {
+    data: contracts = [],
+    isLoading,
+  } = useQuery({
+    queryKey: CONTRACTS_KEY,
+    queryFn: fetchContractsData,
+    staleTime: 30_000,
+  });
 
-      if (error) {
-        console.error('Erro ao carregar contratos:', error);
-        toast.error('Erro ao carregar contratos');
-        return;
-      }
-
-      if (data) {
-        setContracts(data.map(row => ({
-          id: row.id,
-          nomeEV: row.nome_ev,
-          cliente: row.cliente,
-          produto: row.produto,
-          operadora: row.operadora,
-          porte: row.porte as Porte,
-          atingimento: Number(row.atingimento),
-          dataInicio: row.data_inicio,
-          mesesPagosManual: row.meses_pagos_manual || 0,
-          ativo: row.ativo !== false, // default true se null/undefined
-        })));
-      }
-    } catch (error) {
-      console.error('Erro ao carregar contratos:', error);
-      toast.error('Erro ao carregar contratos');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchContracts();
-  }, [fetchContracts]);
+  const invalidate = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: CONTRACTS_KEY });
+  }, [queryClient]);
 
   const addContract = useCallback(async (contract: Omit<Contract, 'id'>) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       const { data, error } = await supabase
         .from('ev_contracts')
         .insert({
@@ -77,20 +74,20 @@ export function useContracts() {
       }
 
       toast.success('Contrato adicionado com sucesso');
-      await fetchContracts();
+      invalidate();
       return data;
     } catch (error) {
       console.error('Erro ao adicionar contrato:', error);
       toast.error('Erro ao adicionar contrato');
       return null;
     }
-  }, [fetchContracts]);
+  }, [invalidate]);
 
-  const addContracts = useCallback(async (contracts: Omit<Contract, 'id'>[]) => {
+  const addContracts = useCallback(async (contractsList: Omit<Contract, 'id'>[]) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
-      const insertData = contracts.map(contract => ({
+
+      const insertData = contractsList.map(contract => ({
         nome_ev: contract.nomeEV,
         cliente: contract.cliente,
         produto: contract.produto,
@@ -112,15 +109,15 @@ export function useContracts() {
         return false;
       }
 
-      toast.success(`${contracts.length} contrato(s) adicionado(s) com sucesso`);
-      await fetchContracts();
+      toast.success(`${contractsList.length} contrato(s) adicionado(s) com sucesso`);
+      invalidate();
       return true;
     } catch (error) {
       console.error('Erro ao adicionar contratos:', error);
       toast.error('Erro ao adicionar contratos');
       return false;
     }
-  }, [fetchContracts]);
+  }, [invalidate]);
 
   const updateContract = useCallback(async (id: string, updates: Partial<Omit<Contract, 'id'>>) => {
     try {
@@ -157,12 +154,12 @@ export function useContracts() {
       }
 
       toast.success('Contrato atualizado');
-      await fetchContracts();
+      invalidate();
     } catch (error) {
       console.error('Erro ao atualizar contrato:', error);
       toast.error('Erro ao atualizar contrato');
     }
-  }, [fetchContracts]);
+  }, [invalidate]);
 
   const deleteContract = useCallback(async (id: string) => {
     try {
@@ -178,12 +175,12 @@ export function useContracts() {
       }
 
       toast.success('Contrato excluído');
-      await fetchContracts();
+      invalidate();
     } catch (error) {
       console.error('Erro ao excluir contrato:', error);
       toast.error('Erro ao excluir contrato');
     }
-  }, [fetchContracts]);
+  }, [invalidate]);
 
   const getContractByKey = useCallback((cliente: string, produto: string, operadora: string) => {
     return contracts.find(c => {
@@ -212,6 +209,6 @@ export function useContracts() {
     getContractByKey,
     getUniqueEVNames,
     getUniqueClientes,
-    refetch: fetchContracts
+    refetch: invalidate
   };
 }

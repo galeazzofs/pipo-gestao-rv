@@ -122,7 +122,7 @@ export function parseExcelFile(file: File): Promise<ParseResult> {
         const worksheet = workbook.Sheets[sheetName];
         
         // Converte para JSON
-        const jsonData = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+        const jsonData = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1 });
         
         if (jsonData.length < 2) {
           resolve({ success: false, data: [], error: 'Planilha vazia ou sem dados' });
@@ -147,7 +147,7 @@ export function parseExcelFile(file: File): Promise<ParseResult> {
         
         // Processa cada linha (a partir da segunda)
         for (let i = 1; i < jsonData.length; i++) {
-          const row = jsonData[i] as any[];
+          const row = jsonData[i] as unknown[];
           if (!row || row.length === 0) continue;
 
           const clienteMae = String(row[mapping.clienteMae] || '').trim();

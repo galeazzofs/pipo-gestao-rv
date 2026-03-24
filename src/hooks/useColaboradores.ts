@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-// Exportando os tipos para serem usados nas páginas
 export type Cargo = 'CN' | 'EV' | 'Lideranca';
 export type Nivel = 'CN1' | 'CN2' | 'CN3' | 'Senior' | 'Pleno' | 'Junior';
 export type Porte = 'M' | 'G+';
@@ -13,7 +13,7 @@ export interface Colaborador {
   email: string | null;
   cargo: Cargo;
   nivel: Nivel | null;
-  porte: Porte | null; // Campo novo
+  porte: Porte | null;
   data_admissao: string | null;
   ativo: boolean;
   lider_id: string | null;
@@ -23,7 +23,6 @@ export interface Colaborador {
   meta_mrr: number | null;
 }
 
-// Interface para input de criação/edição
 export interface ColaboradorInput {
   nome: string;
   email: string;
@@ -45,60 +44,65 @@ export interface MetaMensal {
   meta_sao: number;
 }
 
+const COLABORADORES_KEY = ['colaboradores'] as const;
+const METAS_MENSAIS_KEY = ['metas-mensais'] as const;
+
+async function fetchColaboradoresData(): Promise<Colaborador[]> {
+  const { data, error } = await supabase
+    .from('colaboradores')
+    .select('*')
+    .order('nome');
+
+  if (error) throw error;
+  return data as unknown as Colaborador[];
+}
+
+async function fetchMetasMensaisData(): Promise<MetaMensal[]> {
+  const { data, error } = await supabase
+    .from('metas_sao_mensais')
+    .select('*');
+
+  if (error) throw error;
+  return data as MetaMensal[];
+}
+
 export function useColaboradores() {
-  const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
-  const [metasMensais, setMetasMensais] = useState<MetaMensal[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  // Busca Colaboradores
-  const fetchColaboradores = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('colaboradores')
-        .select('*')
-        .order('nome');
+  const {
+    data: colaboradores = [],
+    isLoading: loadingColaboradores,
+  } = useQuery({
+    queryKey: COLABORADORES_KEY,
+    queryFn: fetchColaboradoresData,
+    staleTime: 30_000,
+  });
 
-      if (error) throw error;
-      
-      // Cast forçado para evitar conflitos de tipagem estrita do Supabase vs Typescript Enums
-      setColaboradores(data as unknown as Colaborador[]);
-    } catch (error) {
-      console.error('Erro ao carregar colaboradores:', error);
-      toast.error('Erro ao carregar time');
-    }
-  }, []);
+  const {
+    data: metasMensais = [],
+    isLoading: loadingMetas,
+  } = useQuery({
+    queryKey: METAS_MENSAIS_KEY,
+    queryFn: fetchMetasMensaisData,
+    staleTime: 30_000,
+  });
 
-  // Busca Metas Mensais
-  const fetchMetasMensais = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('metas_sao_mensais')
-        .select('*');
+  const isLoading = loadingColaboradores || loadingMetas;
 
-      if (error) throw error;
-      setMetasMensais(data as MetaMensal[]);
-    } catch (error) {
-      console.error('Erro ao carregar metas mensais:', error);
-    }
-  }, []);
-
-  // Função unificada de refresh
-  const refetch = async () => {
-    setIsLoading(true);
-    await Promise.all([fetchColaboradores(), fetchMetasMensais()]);
-    setIsLoading(false);
-  };
-
-  useEffect(() => {
-    refetch();
-  }, []);
-
-  // Helpers de filtro (memoizados para evitar re-renders desnecessários)
+  // Helpers de filtro memoizados
   const getCNs = useMemo(() => colaboradores.filter(c => c.cargo === 'CN' && c.ativo), [colaboradores]);
   const getEVs = useMemo(() => colaboradores.filter(c => c.cargo === 'EV' && c.ativo), [colaboradores]);
   const getLideres = useMemo(() => colaboradores.filter(c => c.cargo === 'Lideranca' && c.ativo), [colaboradores]);
 
-  // --- FUNÇÕES DE CRUD (Restauradas) ---
+  const invalidateColaboradores = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: COLABORADORES_KEY });
+  }, [queryClient]);
+
+  const invalidateMetas = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: METAS_MENSAIS_KEY });
+  }, [queryClient]);
+
+  // --- CRUD ---
 
   const addColaborador = useCallback(async (input: ColaboradorInput): Promise<boolean> => {
     try {
@@ -117,22 +121,20 @@ export function useColaboradores() {
       };
 
       const { error } = await supabase.from('colaboradores').insert([payload]);
-
       if (error) throw error;
-      
+
       toast.success('Colaborador adicionado com sucesso');
-      await fetchColaboradores();
+      invalidateColaboradores();
       return true;
     } catch (error) {
       console.error('Erro ao adicionar:', error);
       toast.error('Erro ao adicionar colaborador');
       return false;
     }
-  }, [fetchColaboradores]);
+  }, [invalidateColaboradores]);
 
   const updateColaborador = useCallback(async (id: string, input: Partial<ColaboradorInput>): Promise<boolean> => {
     try {
-      // Constrói payload com nomes de coluna corretos do banco
       const updateData: Record<string, unknown> = {};
       if (input.nome !== undefined) updateData.nome = input.nome;
       if (input.email !== undefined) updateData.email = input.email;
@@ -153,14 +155,14 @@ export function useColaboradores() {
       if (error) throw error;
 
       toast.success('Colaborador atualizado');
-      await fetchColaboradores();
+      invalidateColaboradores();
       return true;
     } catch (error) {
       console.error('Erro ao atualizar:', error);
       toast.error('Erro ao atualizar colaborador');
       return false;
     }
-  }, [fetchColaboradores]);
+  }, [invalidateColaboradores]);
 
   const deleteColaborador = useCallback(async (id: string): Promise<boolean> => {
     try {
@@ -172,29 +174,29 @@ export function useColaboradores() {
       if (error) throw error;
 
       toast.success('Colaborador removido');
-      await fetchColaboradores();
+      invalidateColaboradores();
       return true;
     } catch (error) {
       console.error('Erro ao remover:', error);
       toast.error('Erro ao remover colaborador');
       return false;
     }
-  }, [fetchColaboradores]);
+  }, [invalidateColaboradores]);
 
   const saveMetaMensal = useCallback(async (colaboradorId: string, mes: number, ano: number, metaSao: number): Promise<boolean> => {
     try {
       const { error } = await supabase
         .from('metas_sao_mensais')
-        .upsert({ 
-          colaborador_id: colaboradorId, 
-          mes, 
-          ano, 
-          meta_sao: metaSao 
+        .upsert({
+          colaborador_id: colaboradorId,
+          mes,
+          ano,
+          meta_sao: metaSao
         }, { onConflict: 'colaborador_id,mes,ano' });
 
       if (error) throw error;
-      
-      await fetchMetasMensais(); // Recarrega apenas as metas
+
+      invalidateMetas();
       toast.success('Meta mensal salva com sucesso');
       return true;
     } catch (error) {
@@ -202,14 +204,17 @@ export function useColaboradores() {
       toast.error('Erro ao salvar meta mensal');
       return false;
     }
-  }, [fetchMetasMensais]);
+  }, [invalidateMetas]);
 
   return {
     colaboradores,
     metasMensais,
     isLoading,
-    fetchColaboradores, // Mantive este nome pois é usado no GestaoTime.tsx que te mandei
-    refetch,
+    fetchColaboradores: invalidateColaboradores,
+    refetch: () => {
+      invalidateColaboradores();
+      invalidateMetas();
+    },
     getCNs,
     getEVs,
     getLideres,

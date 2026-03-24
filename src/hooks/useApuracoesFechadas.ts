@@ -123,7 +123,7 @@ export function useApuracoesFechadas() {
       if (error) throw error;
       
       setApuracoes((data || []) as ApuracaoFechada[]);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao buscar apurações:', error);
       toast.error('Erro ao carregar apurações');
     } finally {
@@ -163,7 +163,7 @@ export function useApuracoesFechadas() {
         apuracao: apuracaoData as ApuracaoFechada,
         itens: (itensData || []) as ApuracaoFechadaItem[]
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao carregar rascunho:', error);
       return null;
     }
@@ -281,9 +281,9 @@ export function useApuracoesFechadas() {
       toast.success('Rascunho salvo com sucesso!');
       await fetchApuracoes();
       return apuracaoId;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao salvar rascunho:', error);
-      toast.error(error.message || 'Erro ao salvar rascunho');
+      toast.error(error instanceof Error ? error.message :'Erro ao salvar rascunho');
       return null;
     }
   }, [fetchApuracoes]);
@@ -457,9 +457,9 @@ export function useApuracoesFechadas() {
       toast.success(`Apuração ${tipo} finalizada com sucesso!`);
       await fetchApuracoes();
       return apuracaoId;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao salvar apuração:', error);
-      toast.error(error.message || 'Erro ao salvar apuração');
+      toast.error(error instanceof Error ? error.message :'Erro ao salvar apuração');
       return null;
     }
   }, [fetchApuracoes]);
@@ -477,7 +477,7 @@ export function useApuracoesFechadas() {
       if (error) throw error;
       
       return (data || []) as ApuracaoFechadaItem[];
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao buscar itens da apuração:', error);
       toast.error('Erro ao carregar detalhes da apuração');
       return [];
@@ -508,9 +508,9 @@ export function useApuracoesFechadas() {
       toast.success('Apuração removida com sucesso!');
       await fetchApuracoes();
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao remover apuração:', error);
-      toast.error(error.message || 'Erro ao remover apuração');
+      toast.error(error instanceof Error ? error.message :'Erro ao remover apuração');
       return false;
     }
   }, [fetchApuracoes]);
@@ -530,9 +530,9 @@ export function useApuracoesFechadas() {
       toast.success('Apuração finalizada com sucesso!');
       await fetchApuracoes();
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao finalizar apuração:', error);
-      toast.error(error.message || 'Erro ao finalizar apuração');
+      toast.error(error instanceof Error ? error.message :'Erro ao finalizar apuração');
       return false;
     }
   }, [fetchApuracoes]);
@@ -566,7 +566,7 @@ export function useApuracoesFechadas() {
       if (error) throw error;
 
       return (data || []) as (ApuracaoFechadaItem & { apuracao?: Pick<ApuracaoFechada, 'id' | 'tipo' | 'mes_referencia' | 'data_fechamento' | 'status'> })[];
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao buscar meus resultados:', error);
       return [];
     }

@@ -49,6 +49,25 @@ const adminLinks: NavLinkItem[] = [
   { label: "Histórico", href: "/hub/historico", icon: History },
 ];
 
+function NavLink({ link, active, onClick }: { link: NavLinkItem; active: boolean; onClick: () => void }) {
+  const Icon = link.icon;
+  return (
+    <Link
+      to={link.href}
+      className={cn(
+        "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+        active
+          ? "bg-primary text-primary-foreground shadow-sm"
+          : "text-muted-foreground hover:text-foreground hover:bg-accent",
+      )}
+      onClick={onClick}
+    >
+      <Icon className="h-4 w-4" />
+      <span>{link.label}</span>
+    </Link>
+  );
+}
+
 export function Navbar() {
   const { user, profile, isAdmin, signOut } = useAuth();
   const { colaborador } = useCurrentColaborador();
@@ -62,27 +81,6 @@ export function Navbar() {
   const isActive = (href: string) => {
     if (href === "/") return location.pathname === "/";
     return location.pathname.startsWith(href);
-  };
-
-  const NavLink = ({ link }: { link: NavLinkItem }) => {
-    const Icon = link.icon;
-    const active = isActive(link.href);
-
-    return (
-      <Link
-        to={link.href}
-        className={cn(
-          "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
-          active
-            ? "bg-primary text-primary-foreground shadow-sm"
-            : "text-muted-foreground hover:text-foreground hover:bg-accent",
-        )}
-        onClick={() => setMobileMenuOpen(false)}
-      >
-        <Icon className="h-4 w-4" />
-        <span>{link.label}</span>
-      </Link>
-    );
   };
 
   return (
@@ -102,7 +100,7 @@ export function Navbar() {
             {/* Seção Minha Comissão */}
             <div className="flex items-center gap-0.5 px-2 py-1 rounded-xl bg-muted/50">
               {userLinks.map((link) => (
-                <NavLink key={link.href} link={link} />
+                <NavLink key={link.href} link={link} active={isActive(link.href)} onClick={() => setMobileMenuOpen(false)} />
               ))}
             </div>
 
@@ -114,7 +112,7 @@ export function Navbar() {
                 <div className="flex items-center gap-0.5 px-2 py-1 rounded-xl bg-muted/50">
                   <span className="text-xs font-medium text-muted-foreground px-2 hidden xl:block">Hub</span>
                   {adminLinks.map((link) => (
-                    <NavLink key={link.href} link={link} />
+                    <NavLink key={link.href} link={link} active={isActive(link.href)} onClick={() => setMobileMenuOpen(false)} />
                   ))}
                 </div>
               </>

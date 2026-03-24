@@ -131,7 +131,7 @@ export default function GestaoTime() {
     e.preventDefault();
     setIsSaving(true);
 
-    const payload: any = {
+    const payload = {
       nome: formData.nome,
       email: formData.email,
       cargo: formData.cargo,

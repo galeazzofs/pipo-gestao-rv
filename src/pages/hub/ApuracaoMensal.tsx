@@ -101,8 +101,8 @@ export default function ApuracaoMensal() {
       setDraftId(draft.apuracao.id);
       setLastSaved(draft.apuracao.updated_at ? new Date(draft.apuracao.updated_at) : null);
       
-      const newRows: Record<string, any> = {};
-      
+      const newRows: Record<string, Omit<CNRow, 'colaboradorId' | 'nome' | 'nivel' | 'target'>> = {};
+
       draft.itens.forEach((item: ApuracaoFechadaItem) => {
         if (item.colaborador_id) {
           newRows[item.colaborador_id] = {
@@ -141,7 +141,7 @@ export default function ApuracaoMensal() {
   useEffect(() => {
     if (loadingColaboradores || isLoadingDraft || draftId) return;
 
-    const newRows: Record<string, any> = {};
+    const newRows: Record<string, Omit<CNRow, 'colaboradorId' | 'nome' | 'nivel' | 'target'>> = {};
     let hasChanges = false;
 
     cns.forEach(cn => {
@@ -269,7 +269,7 @@ export default function ApuracaoMensal() {
     const result = await saveApuracao('mensal', mesReferencia, itens);
     setIsSaving(false);
     if (result) {
-      const clearedRows: Record<string, any> = {};
+      const clearedRows: Record<string, Omit<CNRow, 'colaboradorId' | 'nome' | 'nivel' | 'target'>> = {};
       cns.forEach(cn => {
         clearedRows[cn.id] = {
           saoMeta: '', saoRealizado: '', vidasMeta: '', vidasRealizado: '',

@@ -59,12 +59,12 @@ function EVContratosContent() {
     };
   }, [contracts, searchTerm, selectedEV]);
 
-  const handleFormSubmit = async (data: any) => {
+  const handleFormSubmit = async (data: Omit<Contract, 'id'>) => {
     await addContract(data);
     setIsFormOpen(false);
   };
 
-  const handleExcelImport = async (contractsData: any[]) => {
+  const handleExcelImport = async (contractsData: Omit<Contract, 'id'>[]) => {
     await addContracts(contractsData);
     setIsExcelOpen(false);
   };

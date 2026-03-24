@@ -107,58 +107,68 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
-        setSession(newSession);
-        setUser(newSession?.user ?? null);
+    let isMounted = true;
 
-        if (newSession?.user) {
-          try {
-            const [userProfile, adminStatus] = await Promise.all([
-              fetchProfile(newSession.user.id),
-              checkAdminRole(newSession.user.id),
-            ]);
-            setProfile(userProfile);
-            setIsAdmin(adminStatus);
-          } catch (err) {
-            console.error('Erro ao carregar perfil/role:', err);
-          }
-          setLoading(false);
-        } else {
-          setProfile(null);
-          setIsAdmin(false);
+    const loadUserData = async (currentUser: User) => {
+      try {
+        const [userProfile, adminStatus] = await Promise.all([
+          fetchProfile(currentUser.id),
+          checkAdminRole(currentUser.id),
+        ]);
+        if (isMounted) {
+          setProfile(userProfile);
+          setIsAdmin(adminStatus);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar perfil/role:', err);
+      } finally {
+        if (isMounted) {
           setLoading(false);
         }
       }
-    );
+    };
 
-    // THEN get initial session
+    const clearUserData = () => {
+      if (isMounted) {
+        setProfile(null);
+        setIsAdmin(false);
+        setLoading(false);
+      }
+    };
+
+    // Get initial session first
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      if (!isMounted) return;
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
 
       if (initialSession?.user) {
-        Promise.all([
-          fetchProfile(initialSession.user.id),
-          checkAdminRole(initialSession.user.id),
-        ]).then(([userProfile, adminStatus]) => {
-          setProfile(userProfile);
-          setIsAdmin(adminStatus);
-          setLoading(false);
-        }).catch((err) => {
-          console.error('Erro ao carregar perfil/role:', err);
-          setLoading(false);
-        });
+        loadUserData(initialSession.user);
       } else {
         setLoading(false);
       }
     }).catch((err) => {
       console.error('Erro ao buscar sessão:', err);
-      setLoading(false);
+      if (isMounted) setLoading(false);
     });
 
+    // Then set up auth state listener for subsequent changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, newSession) => {
+        if (!isMounted) return;
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+
+        if (newSession?.user) {
+          loadUserData(newSession.user);
+        } else {
+          clearUserData();
+        }
+      }
+    );
+
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, []);
